@@ -377,4 +377,4 @@ with Experiment({
         for c in get_class_names_from_classmap(class_map):
             submission_df[c] = np.mean([d[c].values for d in test_dfs], axis=0)
         submission_df.to_csv(
-            os.path.join(experiment.predictions, "submission.csv"))
+            os.path.join(experiment.predictions, "submission.csv"), index=False)
