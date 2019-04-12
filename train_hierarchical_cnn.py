@@ -16,7 +16,7 @@ from networks.classifiers import HierarchicalCNNClassificationModel
 from ops.folds import train_validation_data
 from ops.transforms import (
     Compose, DropFields, LoadAudio, STFT, MapLabels, RenameFields)
-from ops.utils import load_json
+from ops.utils import load_json, get_class_names_from_classmap, lwlrap
 from ops.padding import make_collate_fn
 
 torch.manual_seed(42)
@@ -36,6 +36,14 @@ parser.add_argument(
 parser.add_argument(
     "--train_data_dir", required=True, type=str,
     help="path to train data"
+)
+parser.add_argument(
+    "--test_data_dir", required=True, type=str,
+    help="path to test data"
+)
+parser.add_argument(
+    "--sample_submission", required=True, type=str,
+    help="path sample submission"
 )
 parser.add_argument(
     "--classmap", required=True, type=str,
@@ -176,15 +184,19 @@ with Experiment({
     print(experiment.config)
 
     train_df = pd.read_csv(args.train_df)
+    test_df = pd.read_csv(args.sample_submission)
 
     if args.max_samples:
         train_df = train_df.sample(args.max_samples).reset_index(drop=True)
+        test_df = test_df.sample(args.max_samples).reset_index(drop=True)
 
     splits = list(train_validation_data(
         train_df.fname, train_df.labels,
         config.data._n_folds, config.data._kfold_seed))
 
     for fold in args.folds:
+
+        print("\n\n   -----  Fold {}\n".format(fold))
 
         train, valid = splits[fold]
 
@@ -198,7 +210,7 @@ with Experiment({
         train_loader = torch.utils.data.DataLoader(
             SoundDataset(
                 audio_files=[
-                    os.path.join(args.train_data_dir + fname)
+                    os.path.join(args.train_data_dir, fname)
                     for fname in train_df.fname[train]],
                 labels=[item.split(",") for item in train_df.labels[train]],
                 transform=Compose([
@@ -219,7 +231,7 @@ with Experiment({
         valid_loader = torch.utils.data.DataLoader(
             SoundDataset(
                 audio_files=[
-                    os.path.join(args.train_data_dir + fname)
+                    os.path.join(args.train_data_dir, fname)
                     for fname in train_df.fname[valid]],
                 labels=[item.split(",") for item in train_df.labels[valid]],
                 transform=Compose([
@@ -255,16 +267,110 @@ with Experiment({
                 "final_model.pth")
         )
 
+        # predictions
+        model.load_best_model(fold)
+
+        # validation
+
+        val_preds = model.predict(valid_loader)
+        val_predictions_df = pd.DataFrame(
+            val_preds, columns=get_class_names_from_classmap(class_map))
+        val_predictions_df["fname"] = train_df.fname[valid]
+        val_predictions_df.to_csv(
+            os.path.join(
+                experiment.predictions,
+                "val_preds_fold_{}.csv".format(fold)
+            ),
+            index=False
+        )
+
+        # test
+        test_loader = torch.utils.data.DataLoader(
+            SoundDataset(
+                audio_files=[
+                    os.path.join(args.test_data_dir, fname)
+                    for fname in test_df.fname],
+                transform=Compose([
+                    LoadAudio(),
+                    STFT(n_fft=args.n_fft, hop_size=args.hop_size),
+                    DropFields(("audio", "filename", "sr")),
+                    RenameFields({"stft": "signal"})
+                ])
+            ),
+            shuffle=False,
+            batch_size=config.train.batch_size,
+            collate_fn=make_collate_fn({"signal": math.log(STFT.eps)}),
+            **loader_kwargs
+        )
+
+        test_preds = model.predict(test_loader)
+        test_predictions_df = pd.DataFrame(
+            test_preds, columns=get_class_names_from_classmap(class_map))
+        test_predictions_df["fname"] = test_df.fname
+        test_predictions_df.to_csv(
+            os.path.join(
+                experiment.predictions,
+                "test_preds_fold_{}.csv".format(fold)
+            ),
+            index=False
+        )
+
         if args.device == "cuda":
             torch.cuda.empty_cache()
+
+    # avg metric
 
     if all(
         "fold{}".format(k) in experiment.results.to_dict()
         for k in range(config.data._n_folds)):
 
-        average_metric = np.mean([
-            experiment.results.to_dict()["fold{}".format(k)]["metric"]
-            for k in range(config.data._n_folds)
+        val_df_files = [
+            os.path.join(
+                experiment.predictions,
+                "val_preds_fold_{}.csv".format(fold)
+            )
+            for fold in range(config.data._n_folds)
+        ]
+
+        val_predictions_df = pd.concat([
+            pd.read_csv(file) for file in val_df_files])
+
+        labels =  np.asarray([
+            item["labels"] for item in SoundDataset(
+                audio_files=train_df.fname.tolist(),
+                labels=[item.split(",") for item in train_df.labels],
+                transform=MapLabels(class_map)
+            )
         ])
 
-        experiment.register_result("avg_metric", average_metric)
+        val_labels_df = pd.DataFrame(
+            labels, columns=get_class_names_from_classmap(class_map))
+        val_labels_df["fname"] = train_df.fname
+
+        val_predictions_df.sort_values(by="fname", inplace=True)
+        val_labels_df.sort_values(by="fname", inplace=True)
+
+        metric = lwlrap(
+            val_labels_df.drop("fname", axis=1).values,
+            val_predictions_df.drop("fname", axis=1).values
+        )
+
+        experiment.register_result("metric", metric)
+
+    # submission
+
+    test_df_files = [
+        os.path.join(
+            experiment.predictions,
+            "test_preds_fold_{}.csv".format(fold)
+        )
+        for fold in range(config.data._n_folds)
+    ]
+
+    if all(os.path.isfile for file in test_df_files):
+        test_dfs = [pd.read_csv(file) for file in test_df_files]
+        submission_df = pd.DataFrame({"fname": test_dfs[0].fname})
+        for c in get_class_names_from_classmap(class_map):
+            submission_df[c] = np.mean([d[c].values for d in test_dfs], axis=0)
+        submission_df.to_csv(
+            os.path.join(experiment.predictions, "submission.csv"))

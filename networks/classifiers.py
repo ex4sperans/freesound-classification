@@ -264,8 +264,6 @@ class HierarchicalCNNClassificationModel(nn.Module):
 
     def predict(self, loader):
 
-        self.device = "cuda" if next(self.parameters()).is_cuda else "cpu"
-
         self.eval()
 
         all_class_probs = []
@@ -282,7 +280,7 @@ class HierarchicalCNNClassificationModel(nn.Module):
                 class_probs = torch.sigmoid(class_logits).data.cpu().numpy()
                 all_class_probs.extend(class_probs)
 
-        all_class_probs = np.asarray(all_class_probs).tolist()
+        all_class_probs = np.asarray(all_class_probs)
 
         return all_class_probs
 
@@ -317,6 +315,7 @@ class HierarchicalCNNClassificationModel(nn.Module):
         self.make_optimizer()
 
         scores = []
+        best_score = 0
 
         for epoch in range(epochs):
 
@@ -340,6 +339,17 @@ class HierarchicalCNNClassificationModel(nn.Module):
                     )
                 )
 
+            if validation_score > best_score:
+                torch.save(
+                    self.state_dict(),
+                    os.path.join(
+                        self.experiment.checkpoints,
+                        "fold_{}".format(fold),
+                        "best_model.pth"
+                    )
+                )
+                best_score = validation_score
+
         return scores
 
     def make_optimizer(self):
@@ -353,3 +363,14 @@ class HierarchicalCNNClassificationModel(nn.Module):
         self.optimizer = optimizer
         self.scheduler = make_scheduler(self.config.train.scheduler)(optimizer)
 
+    def load_best_model(self, fold):
+
+        self.load_state_dict(
+            torch.load(
+                os.path.join(
+                    self.experiment.checkpoints,
+                    "fold_{}".format(fold),
+                    "best_model.pth"
+                )
+            )
+        )

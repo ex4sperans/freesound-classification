@@ -21,3 +21,9 @@ def lwlrap(truth, scores):
 def load_json(file):
     with open(file, "r") as f:
         return json.load(f)
+
+
+def get_class_names_from_classmap(classmap):
+    r = dict((v, k) for k, v in classmap.items())
+    return [r[label] for label in sorted(classmap.values())]
+
