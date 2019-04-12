@@ -211,8 +211,8 @@ with Experiment({
             SoundDataset(
                 audio_files=[
                     os.path.join(args.train_data_dir, fname)
-                    for fname in train_df.fname[train]],
-                labels=[item.split(",") for item in train_df.labels[train]],
+                    for fname in train_df.fname.values[train]],
+                labels=[item.split(",") for item in train_df.labels.values[train]],
                 transform=Compose([
                     LoadAudio(),
                     MapLabels(class_map=class_map),
@@ -232,8 +232,8 @@ with Experiment({
             SoundDataset(
                 audio_files=[
                     os.path.join(args.train_data_dir, fname)
-                    for fname in train_df.fname[valid]],
-                labels=[item.split(",") for item in train_df.labels[valid]],
+                    for fname in train_df.fname.values[valid]],
+                labels=[item.split(",") for item in train_df.labels.values[valid]],
                 transform=Compose([
                     LoadAudio(),
                     MapLabels(class_map=class_map),
@@ -275,7 +275,7 @@ with Experiment({
         val_preds = model.predict(valid_loader)
         val_predictions_df = pd.DataFrame(
             val_preds, columns=get_class_names_from_classmap(class_map))
-        val_predictions_df["fname"] = train_df.fname[valid]
+        val_predictions_df["fname"] = train_df.fname[valid].values
         val_predictions_df.to_csv(
             os.path.join(
                 experiment.predictions,
@@ -283,13 +283,14 @@ with Experiment({
             ),
             index=False
         )
+        del val_predictions_df
 
         # test
         test_loader = torch.utils.data.DataLoader(
             SoundDataset(
                 audio_files=[
                     os.path.join(args.test_data_dir, fname)
-                    for fname in test_df.fname],
+                    for fname in test_df.fname.values],
                 transform=Compose([
                     LoadAudio(),
                     STFT(n_fft=args.n_fft, hop_size=args.hop_size),
@@ -314,11 +315,12 @@ with Experiment({
             ),
             index=False
         )
+        del test_predictions_df
 
         if args.device == "cuda":
             torch.cuda.empty_cache()
 
-    # avg metric
+    # global metric
 
     if all(
         "fold{}".format(k) in experiment.results.to_dict()
@@ -333,12 +335,12 @@ with Experiment({
         ]
 
         val_predictions_df = pd.concat([
-            pd.read_csv(file) for file in val_df_files])
+            pd.read_csv(file) for file in val_df_files]).reset_index(drop=True)
 
-        labels =  np.asarray([
+        labels = np.asarray([
             item["labels"] for item in SoundDataset(
                 audio_files=train_df.fname.tolist(),
-                labels=[item.split(",") for item in train_df.labels],
+                labels=[item.split(",") for item in train_df.labels.values],
                 transform=MapLabels(class_map)
             )
         ])
@@ -346,6 +348,8 @@ with Experiment({
         val_labels_df = pd.DataFrame(
             labels, columns=get_class_names_from_classmap(class_map))
         val_labels_df["fname"] = train_df.fname
+
+        assert set(val_predictions_df.fname) == set(val_labels_df.fname)
 
         val_predictions_df.sort_values(by="fname", inplace=True)
         val_labels_df.sort_values(by="fname", inplace=True)
@@ -369,7 +373,7 @@ with Experiment({
 
     if all(os.path.isfile for file in test_df_files):
         test_dfs = [pd.read_csv(file) for file in test_df_files]
-        submission_df = pd.DataFrame({"fname": test_dfs[0].fname})
+        submission_df = pd.DataFrame({"fname": test_dfs[0].fname.values})
         for c in get_class_names_from_classmap(class_map):
             submission_df[c] = np.mean([d[c].values for d in test_dfs], axis=0)
         submission_df.to_csv(
