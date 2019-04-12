@@ -93,6 +93,7 @@ class HierarchicalCNNClassificationModel(nn.Module):
 
         self.output_transform = nn.Sequential(
             nn.BatchNorm1d(total_depth),
+            nn.Dropout(p=self.config.network.dropout),
             nn.Linear(total_depth, self.config.data._n_classes)
         )
 

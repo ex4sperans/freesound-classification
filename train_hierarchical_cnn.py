@@ -100,6 +100,10 @@ parser.add_argument(
     help="weight decay"
 )
 parser.add_argument(
+    "--dropout", type=float, default=0.0,
+    help="output dropout"
+)
+parser.add_argument(
     "--n_fft", type=int, default=512,
     help="number of fft bins"
 )
@@ -143,6 +147,7 @@ with Experiment({
         "start_deep_supervision_on": args.start_deep_supervision_on,
         "conv_base_depth": args.conv_base_depth,
         "growth_rate": args.growth_rate,
+        "dropout": args.dropout
     },
     "data": {
         "_n_folds": args.n_folds,
