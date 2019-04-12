@@ -46,6 +46,8 @@ class LoadAudio:
 
 class STFT:
 
+    eps = 1e-4
+
     def __init__(self, n_fft, hop_size):
 
         self.n_fft = n_fft
@@ -54,10 +56,12 @@ class STFT:
     def __call__(self, dataset, **inputs):
 
         stft = compute_stft(
-            inputs["audio"], window_size=self.n_fft, hop_size=self.hop_size)
+            inputs["audio"],
+            window_size=self.n_fft, hop_size=self.hop_size,
+            eps=self.eps)
 
         transformed = dict(inputs)
-        transformed["stft"] = stft
+        transformed["stft"] = np.transpose(stft)
 
         return transformed
 
@@ -87,6 +91,22 @@ class DropFields:
         for name, input in inputs.items():
             if not name in self.to_drop:
                 transformed[name] = input
+
+        return transformed
+
+
+class RenameFields:
+
+    def __init__(self, mapping):
+
+        self.mapping = mapping
+
+    def __call__(self, dataset, **inputs):
+
+        transformed = dict(inputs)
+
+        for old, new in self.mapping.items():
+            transformed[new] = transformed.pop(old)
 
         return transformed
 

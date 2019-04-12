@@ -27,7 +27,7 @@ class SoundDataset(data.Dataset):
             sample["raw_labels"] = self.labels[index]
 
         if self.transform is not None:
-            sample = self.transform(**sample)
+            sample = self.transform(dataset=self, **sample)
 
         return sample
 
