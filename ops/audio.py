@@ -1,3 +1,5 @@
+import random
+
 import numpy as np
 import librosa
 import scipy.signal
@@ -23,3 +25,25 @@ def trim_audio(audio):
 def read_audio(file):
     audio, sr = librosa.load(file, sr=None)
     return audio, sr
+
+
+def mix_audio_and_labels(first_audio, second_audio, first_labels, second_labels):
+
+    new_labels = np.clip(first_labels + second_labels, 0, 1)
+
+    shorter, longer = first_audio, second_audio
+
+    if shorter.size == longer.size:
+        return (shorter + longer) / 2, new_labels
+
+    if first_audio.size > second_audio.size:
+        shorter, longer = longer, shorter
+
+    start = random.randint(0, longer.size - 1 - shorter.size)
+    end = start + shorter.size
+
+
+    longer[start:end] = shorter
+    longer /= 2     # average
+
+    return longer, new_labels

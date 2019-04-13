@@ -5,7 +5,7 @@ import json
 import numpy as np
 import torch
 
-from ops.audio import read_audio, compute_stft, trim_audio
+from ops.audio import read_audio, compute_stft, trim_audio, mix_audio_and_labels
 
 
 class MapLabels:
@@ -23,6 +23,30 @@ class MapLabels:
         transformed = dict(inputs)
         transformed["labels"] = labels
         transformed.pop("raw_labels")
+
+        return transformed
+
+
+class MixUp:
+
+    def __init__(self, p):
+
+        self.p = p
+
+    def __call__(self, dataset, **inputs):
+
+        transformed = dict(inputs)
+
+        if np.random.uniform() < self.p:
+            first_audio, first_labels = inputs["audio"], inputs["labels"]
+            random_sample = dataset.random_clean_sample()
+            new_audio, new_labels = mix_audio_and_labels(
+                first_audio, random_sample["audio"],
+                first_labels, random_sample["labels"]
+            )
+
+            transformed["audio"] = new_audio
+            transformed["labels"] = new_labels
 
         return transformed
 

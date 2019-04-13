@@ -16,7 +16,8 @@ from datasets.sound_dataset import SoundDataset
 from networks.classifiers import HierarchicalCNNClassificationModel
 from ops.folds import train_validation_data
 from ops.transforms import (
-    Compose, DropFields, LoadAudio, STFT, MapLabels, RenameFields)
+    Compose, DropFields, LoadAudio,
+    STFT, MapLabels, RenameFields, MixUp)
 from ops.utils import load_json, get_class_names_from_classmap, lwlrap
 from ops.padding import make_collate_fn
 
@@ -121,8 +122,8 @@ parser.add_argument(
     help="output dropout"
 )
 parser.add_argument(
-    "--input_dropout", type=float, default=0.0,
-    help="input dropout"
+    "--p_mixup", type=float, default=0.0,
+    help="probability of the mixup augmentation"
 )
 parser.add_argument(
     "--n_fft", type=int, default=512,
@@ -169,7 +170,6 @@ with Experiment({
         "conv_base_depth": args.conv_base_depth,
         "growth_rate": args.growth_rate,
         "dropout": args.dropout,
-        "input_dropout": args.input_dropout,
         "output_dropout": args.output_dropout,
     },
     "data": {
@@ -179,7 +179,8 @@ with Experiment({
         "hop_size": args.hop_size,
         "_input_dim": args.n_fft // 2 + 1,
         "_n_classes": len(class_map),
-        "_holdout_size": args.holdout_size
+        "_holdout_size": args.holdout_size,
+        "p_mixup": args.p_mixup
     },
     "train": {
         "accumulation_steps": args.accumulation_steps,
@@ -204,7 +205,8 @@ with Experiment({
 
     if args.max_samples:
         train_df = train_df.sample(args.max_samples).reset_index(drop=True)
-        test_df = test_df.sample(args.max_samples).reset_index(drop=True)
+        test_df = test_df.sample(
+            min(args.max_samples, len(test_df))).reset_index(drop=True)
 
     if args.holdout_size:
         keep, holdout = train_test_split(
@@ -239,9 +241,14 @@ with Experiment({
                 transform=Compose([
                     LoadAudio(),
                     MapLabels(class_map=class_map),
+                    MixUp(p=args.p_mixup),
                     STFT(n_fft=args.n_fft, hop_size=args.hop_size),
                     DropFields(("audio", "filename", "sr")),
                     RenameFields({"stft": "signal"})
+                ]),
+                clean_transform=Compose([
+                    LoadAudio(),
+                    MapLabels(class_map=class_map),
                 ])
             ),
             shuffle=True,

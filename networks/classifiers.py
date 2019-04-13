@@ -79,8 +79,6 @@ class HierarchicalCNNClassificationModel(nn.Module):
 
         total_depth = 0
 
-        self.in_dropout = ConvLockedDropout(self.config.network.input_dropout)
-
         for k in range(self.config.network.num_conv_blocks):
 
             input_size = self.config.data._input_dim if not k else depth
@@ -121,7 +119,6 @@ class HierarchicalCNNClassificationModel(nn.Module):
     def forward(self, signal):
 
         signal = signal.permute(0, 2, 1)
-        signal = self.in_dropout(signal)
 
         features = []
 
