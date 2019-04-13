@@ -109,7 +109,15 @@ parser.add_argument(
 )
 parser.add_argument(
     "--dropout", type=float, default=0.0,
+    help="internal dropout"
+)
+parser.add_argument(
+    "--output_dropout", type=float, default=0.0,
     help="output dropout"
+)
+parser.add_argument(
+    "--input_dropout", type=float, default=0.0,
+    help="input dropout"
 )
 parser.add_argument(
     "--n_fft", type=int, default=512,
@@ -155,7 +163,9 @@ with Experiment({
         "start_deep_supervision_on": args.start_deep_supervision_on,
         "conv_base_depth": args.conv_base_depth,
         "growth_rate": args.growth_rate,
-        "dropout": args.dropout
+        "dropout": args.dropout,
+        "input_dropout": args.input_dropout,
+        "output_dropout": args.output_dropout,
     },
     "data": {
         "_n_folds": args.n_folds,

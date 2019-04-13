@@ -16,6 +16,22 @@ from networks.losses import binary_cross_entropy, focal_loss
 from ops.utils import lwlrap
 
 
+class ConvLockedDropout(nn.Module):
+    def __init__(self, dropout_rate=0.0):
+        super().__init__()
+        self.dropout_rate = dropout_rate
+
+    def forward(self, x):
+        if not self.training or not self.dropout_rate:
+            return x
+
+        n, s, t = x.size()
+
+        m = torch.zeros(n, s, 1, device=x.device).bernoulli_(1 - self.dropout_rate)
+        m = m.expand_as(x)
+        return m * x
+
+
 class ResnetBlock(nn.Module):
 
     def __init__(self, depth):
@@ -63,6 +79,8 @@ class HierarchicalCNNClassificationModel(nn.Module):
 
         total_depth = 0
 
+        self.in_dropout = ConvLockedDropout(self.config.network.input_dropout)
+
         for k in range(self.config.network.num_conv_blocks):
 
             input_size = self.config.data._input_dim if not k else depth
@@ -84,6 +102,7 @@ class HierarchicalCNNClassificationModel(nn.Module):
                 nn.MaxPool1d(kernel_size=2, stride=2),
                 nn.BatchNorm1d(depth),
                 nn.ReLU(inplace=True),
+                ConvLockedDropout(self.config.network.dropout),
                 ResnetBlock(depth)
             ])
 
@@ -93,7 +112,7 @@ class HierarchicalCNNClassificationModel(nn.Module):
 
         self.output_transform = nn.Sequential(
             nn.BatchNorm1d(total_depth),
-            nn.Dropout(p=self.config.network.dropout),
+            nn.Dropout(p=self.config.network.output_dropout),
             nn.Linear(total_depth, self.config.data._n_classes)
         )
 
@@ -102,6 +121,7 @@ class HierarchicalCNNClassificationModel(nn.Module):
     def forward(self, signal):
 
         signal = signal.permute(0, 2, 1)
+        signal = self.in_dropout(signal)
 
         features = []
 
