@@ -60,6 +60,7 @@ class HierarchicalCNNClassificationModel(nn.Module):
         self.config = experiment.config
 
         self.conv_modules = torch.nn.ModuleList()
+        self.deep_supervision_modules = torch.nn.ModuleList()
 
         total_depth = 0
 
@@ -72,6 +73,14 @@ class HierarchicalCNNClassificationModel(nn.Module):
 
             if k >= self.config.network.start_deep_supervision_on:
                 total_depth += depth
+                self.deep_supervision_modules.append(
+                    nn.Conv1d(
+                        depth,
+                        depth,
+                        kernel_size=1,
+                        padding=0
+                    )
+                )
 
             modules = [nn.BatchNorm1d(input_size)] if not k else []
             modules.extend([
@@ -109,7 +118,9 @@ class HierarchicalCNNClassificationModel(nn.Module):
         for k, module in enumerate(self.conv_modules):
             h = module(h)
             if k >= self.config.network.start_deep_supervision_on:
-                features.append(self.global_maxpool(h).squeeze(-1))
+                n = k - self.config.network.start_deep_supervision_on
+                to_pool = self.deep_supervision_modules[n](h)
+                features.append(self.global_maxpool(to_pool).squeeze(-1))
 
         features = torch.cat(features, -1)
 
