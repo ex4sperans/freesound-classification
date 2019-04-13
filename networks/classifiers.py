@@ -226,7 +226,7 @@ class HierarchicalCNNClassificationModel(nn.Module):
                     self.add_image_summaries(
                         signal, self.global_step, self.train_writer)
 
-    def validation(self, valid_loader, epoch):
+    def evaluate(self, loader, verbose=False, write_summary=False, epoch=None):
 
         self.eval()
 
@@ -235,10 +235,8 @@ class HierarchicalCNNClassificationModel(nn.Module):
         all_class_probs = []
         all_labels = []
 
-        write_on = np.random.randint(len(valid_loader))
-
         with torch.no_grad():
-            for batch_idx, sample in enumerate(valid_loader):
+            for batch_idx, sample in enumerate(loader):
 
                 signal, labels = (
                     sample["signal"].to(self.device),
@@ -256,7 +254,7 @@ class HierarchicalCNNClassificationModel(nn.Module):
                     )
                 ).item()
 
-                multiplier = len(labels) / len(valid_loader.dataset)
+                multiplier = len(labels) / len(loader.dataset)
 
                 valid_loss += loss * multiplier
 
@@ -271,16 +269,23 @@ class HierarchicalCNNClassificationModel(nn.Module):
 
             metric = lwlrap(all_labels, all_class_probs)
 
-            self.add_scalar_summaries(
-                valid_loss,
-                metric,
-                writer=self.valid_writer, global_step=self.global_step
-            )
+            if write_summary:
+                self.add_scalar_summaries(
+                    valid_loss,
+                    metric,
+                    writer=self.valid_writer, global_step=self.global_step
+                )
 
-            print("\nValidation loss: {:.4f}".format(valid_loss))
-            print("Validation metric: {:.4f}".format(metric))
+            if verbose:
+                print("\nValidation loss: {:.4f}".format(valid_loss))
+                print("Validation metric: {:.4f}".format(metric))
 
             return metric
+
+    def validation(self, valid_loader, epoch):
+        return self.evaluate(
+            valid_loader,
+            verbose=True, write_summary=True, epoch=epoch)
 
     def predict(self, loader):
 

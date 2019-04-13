@@ -10,6 +10,7 @@ import numpy as np
 import torch
 from mag.experiment import Experiment
 import mag
+from sklearn.model_selection import train_test_split
 
 from datasets.sound_dataset import SoundDataset
 from networks.classifiers import HierarchicalCNNClassificationModel
@@ -65,6 +66,10 @@ parser.add_argument(
 parser.add_argument(
     "--max_samples", type=int,
     help="maximum number of samples to use"
+)
+parser.add_argument(
+    "--holdout_size", type=float, default=0.0,
+    help="size of holdout set"
 )
 parser.add_argument(
     "--epochs", default=100, type=int,
@@ -173,7 +178,8 @@ with Experiment({
         "n_fft": args.n_fft,
         "hop_size": args.hop_size,
         "_input_dim": args.n_fft // 2 + 1,
-        "_n_classes": len(class_map)
+        "_n_classes": len(class_map),
+        "_holdout_size": args.holdout_size
     },
     "train": {
         "accumulation_steps": args.accumulation_steps,
@@ -199,6 +205,13 @@ with Experiment({
     if args.max_samples:
         train_df = train_df.sample(args.max_samples).reset_index(drop=True)
         test_df = test_df.sample(args.max_samples).reset_index(drop=True)
+
+    if args.holdout_size:
+        keep, holdout = train_test_split(
+            np.arange(len(train_df)), test_size=args.holdout_size,
+            random_state=args.kfold_seed)
+        holdout_df = train_df.iloc[holdout].reset_index(drop=True)
+        train_df = train_df.iloc[keep].reset_index(drop=True)
 
     splits = list(train_validation_data(
         train_df.fname, train_df.labels,
@@ -326,6 +339,34 @@ with Experiment({
             index=False
         )
         del test_predictions_df
+
+        # holdout
+        if args.holdout_size:
+            holdout_loader = torch.utils.data.DataLoader(
+                SoundDataset(
+                    audio_files=[
+                        os.path.join(args.train_data_dir, fname)
+                        for fname in holdout_df.fname.values],
+                    labels=[item.split(",") for item in holdout_df.labels.values],
+                    transform=Compose([
+                        LoadAudio(),
+                        MapLabels(class_map),
+                        STFT(n_fft=args.n_fft, hop_size=args.hop_size),
+                        DropFields(("audio", "filename", "sr")),
+                        RenameFields({"stft": "signal"})
+                    ])
+                ),
+                shuffle=False,
+                batch_size=config.train.batch_size,
+                collate_fn=make_collate_fn({"signal": math.log(STFT.eps)}),
+                **loader_kwargs
+            )
+
+            holdout_metric = model.evaluate(holdout_loader)
+            experiment.register_result(
+                "fold{}.holdout_metric".format(fold), holdout_metric)
+
+            print("\nHoldout metric: {:.4f}".format(holdout_metric))
 
         if args.device == "cuda":
             torch.cuda.empty_cache()
