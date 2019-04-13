@@ -8,6 +8,11 @@ import torch
 from ops.audio import read_audio, compute_stft, trim_audio, mix_audio_and_labels
 
 
+class Augmentation:
+    """A base class for data augmentation transforms"""
+    pass
+
+
 class MapLabels:
 
     def __init__(self, class_map, drop_raw=True):
@@ -27,7 +32,7 @@ class MapLabels:
         return transformed
 
 
-class MixUp:
+class MixUp(Augmentation):
 
     def __init__(self, p):
 
@@ -139,6 +144,11 @@ class Compose:
 
     def __init__(self, transforms):
         self.transforms = transforms
+
+    def switch_off_augmentations(self):
+        for t in self.transforms:
+            if isinstance(t, Augmentation):
+                t.p = 0.0
 
     def __call__(self, dataset=None, **inputs):
         for t in self.transforms:

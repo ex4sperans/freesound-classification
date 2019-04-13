@@ -126,6 +126,10 @@ parser.add_argument(
     help="probability of the mixup augmentation"
 )
 parser.add_argument(
+    "--switch_off_augmentations_on", type=int, default=20,
+    help="on which epoch to remove augmentations"
+)
+parser.add_argument(
     "--n_fft", type=int, default=512,
     help="number of fft bins"
 )
@@ -190,7 +194,8 @@ with Experiment({
         "optimizer": args.optimizer,
         "epochs": args.epochs,
         "_save_every": args.save_every,
-        "weight_decay": args.weight_decay
+        "weight_decay": args.weight_decay,
+        "switch_off_augmentations_on": args.switch_off_augmentations_on
     },
     "label": args.label
 }) as experiment:

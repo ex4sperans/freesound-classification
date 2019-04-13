@@ -343,6 +343,9 @@ class HierarchicalCNNClassificationModel(nn.Module):
 
             make_step(self.scheduler, epoch=epoch)
 
+            if epoch == self.config.train.switch_off_augmentations_on:
+                train_loader.dataset.transform.switch_off_augmentations()
+
             self.train_epoch(
                 train_loader, epoch,
                 log_interval, write_summary=True
