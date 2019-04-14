@@ -164,7 +164,7 @@ with Experiment({
     "data": {
         "_n_folds": args.n_folds,
         "_kfold_seed": args.kfold_seed,
-        "n_fft": args.n_fft,
+        "n_fft": pretrained.config.data.n_fft,
         "hop_size": pretrained.config.data.hop_size,
         "_input_dim": pretrained.config.data.n_fft // 2 + 1,
         "_n_classes": len(class_map),
