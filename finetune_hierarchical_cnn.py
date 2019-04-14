@@ -150,7 +150,7 @@ args = parser.parse_args()
 
 class_map = load_json(args.classmap)
 
-pretrained_experiment = Experiment(resume_from=args.pretrained_model)
+pretrained = Experiment(resume_from=args.pretrained_model)
 
 with Experiment({
     "network": {
@@ -275,7 +275,7 @@ with Experiment({
         model.load_state_dict(
             torch.load(
                 os.path.join(
-                    pretrained_experiment.checkpoints,
+                    pretrained.checkpoints,
                     "fold_{}".format(args.pretrained_fold),
                     "best_model.pth"
                 )
