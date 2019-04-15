@@ -12,7 +12,7 @@ import torchvision.utils
 from tensorboardX import SummaryWriter
 
 from ops.training import OPTIMIZERS, make_scheduler, make_step
-from networks.losses import binary_cross_entropy, focal_loss
+from networks.losses import binary_cross_entropy, focal_loss, lsep_loss
 from ops.utils import lwlrap
 
 
@@ -190,7 +190,7 @@ class HierarchicalCNNClassificationModel(nn.Module):
                 class_logits = outputs["class_logits"].squeeze()
 
                 loss = (
-                    focal_loss(
+                    lsep_loss(
                         class_logits,
                         labels
                     )
@@ -245,7 +245,7 @@ class HierarchicalCNNClassificationModel(nn.Module):
                 class_logits = outputs["class_logits"].squeeze()
 
                 loss = (
-                    focal_loss(
+                    lsep_loss(
                         class_logits,
                         labels,
                     )
