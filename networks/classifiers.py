@@ -89,7 +89,12 @@ class HierarchicalCNNClassificationModel(nn.Module):
             if k >= self.config.network.start_deep_supervision_on:
                 total_depth += depth
 
-            modules = [nn.BatchNorm1d(input_size)] if not k else []
+            if self.config.network.input_norm_type == "bn":
+                norm = nn.BatchNorm1d(input_size)
+            elif self.config.network.input_norm_type == "ins":
+                norm = nn.InstanceNorm1d(input_size, track_running_stats=False)
+
+            modules = [norm] if not k else []
             modules.extend([
                 nn.Conv1d(
                     input_size,

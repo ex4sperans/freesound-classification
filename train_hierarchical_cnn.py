@@ -102,6 +102,11 @@ parser.add_argument(
     choices=("cuda", "cpu")
 )
 parser.add_argument(
+    "--input_norm_type", type=str, required=True,
+    help="type of normalization applied on input",
+    choices=("bn", "ins")
+)
+parser.add_argument(
     "--num_conv_blocks", type=int, default=5,
     help="number of conv blocks"
 )
@@ -183,6 +188,7 @@ with Experiment({
         "growth_rate": args.growth_rate,
         "dropout": args.dropout,
         "output_dropout": args.output_dropout,
+        "input_norm_type": args.input_norm_type
     },
     "data": {
         "_n_folds": args.n_folds,
