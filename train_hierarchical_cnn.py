@@ -40,6 +40,14 @@ parser.add_argument(
     help="path to train data"
 )
 parser.add_argument(
+    "--noisy_train_df", type=str,
+    help="path to noisy train dataframe (optional)"
+)
+parser.add_argument(
+    "--noisy_train_data_dir", type=str,
+    help="path to noisy train data (optional)"
+)
+parser.add_argument(
     "--test_data_dir", required=True, type=str,
     help="path to test data"
 )
@@ -208,6 +216,9 @@ with Experiment({
     train_df = pd.read_csv(args.train_df)
     test_df = pd.read_csv(args.sample_submission)
 
+    if args.noisy_train_df:
+        noisy_train_df = pd.read_csv(args.noisy_train_df)
+
     if args.max_samples:
         train_df = train_df.sample(args.max_samples).reset_index(drop=True)
         test_df = test_df.sample(
@@ -237,12 +248,24 @@ with Experiment({
         experiment.register_directory("checkpoints")
         experiment.register_directory("predictions")
 
+        if args.noisy_train_df:
+            noisy_audio_files = [
+                os.path.join(args.noisy_train_data_dir, fname)
+                for fname in noisy_train_df.fname.values]
+            noisy_labels = [
+                item.split(",") for item in noisy_train_df.labels.values]
+        else:
+            noisy_audio_files = []
+            noisy_labels = []
+
         train_loader = torch.utils.data.DataLoader(
             SoundDataset(
                 audio_files=[
                     os.path.join(args.train_data_dir, fname)
-                    for fname in train_df.fname.values[train]],
-                labels=[item.split(",") for item in train_df.labels.values[train]],
+                    for fname in train_df.fname.values[train]] + noisy_audio_files,
+                labels=[
+                    item.split(",") for item in
+                    train_df.labels.values[train]] + noisy_labels,
                 transform=Compose([
                     LoadAudio(),
                     MapLabels(class_map=class_map),
