@@ -12,7 +12,7 @@ OPTIMIZERS = {
 }
 
 
-def make_scheduler(params):
+def make_scheduler(params, max_steps):
 
     name, *args = params.split("_")
 
@@ -24,21 +24,14 @@ def make_scheduler(params):
 
         return partial(StepLR, step_size=step_size, gamma=gamma)
 
-    elif name == "cyclic":
+    elif name == "1cycle":
 
-        mode, base_lr, max_lr, step_size = args
-        base_lr = float(base_lr)
+        min_lr, max_lr = args
+        min_lr = float(min_lr)
         max_lr = float(max_lr)
-        step_size = int(step_size)
-
-        if mode == "tri":
-            mode = "triangular"
-        elif mode == "tri2":
-            mode = "triangular2"
 
         return partial(
-            CyclicLR, mode=mode, base_lr=base_lr,
-            max_lr=max_lr, step_size=step_size)
+            OneCycleScheduler, min_lr=min_lr, max_lr=max_lr, max_steps=max_steps)
 
 
 def make_step(scheduler, epoch=None, step=None, val_score=None):
@@ -46,8 +39,8 @@ def make_step(scheduler, epoch=None, step=None, val_score=None):
     if isinstance(scheduler, StepLR) and epoch is not None:
         scheduler.step(epoch)
 
-    elif isinstance(scheduler, CyclicLR) and step is not None:
-        scheduler.batch_step(step)
+    elif isinstance(scheduler, OneCycleScheduler) and step is not None:
+        scheduler.step()
 
 
 class CyclicLR:
@@ -202,3 +195,41 @@ class CyclicLR:
                 lr = base_lr + base_height * self.scale_fn(self.last_batch_iteration)
             lrs.append(lr)
         return lrs
+
+
+def annealing_linear(start, end, r):
+    return start + r * (end - start)
+
+def annealing_cos(start, end, r):
+    cos_out = np.cos(np.pi * r) + 1
+    return end + (start - end) / 2 * cos_out
+
+
+class OneCycleScheduler:
+    def __init__(
+        self, optimizer,
+        min_lr, max_lr,
+        max_steps, annealing=annealing_linear):
+
+        self.optimizer = optimizer
+        self.min_lr = min_lr
+        self.max_lr = max_lr
+        self.max_steps = max_steps
+        self.annealing = annealing
+        self.epoch = -1
+
+    def step(self):
+        self.epoch += 1
+
+        mid = int(round(self.max_steps * 0.3))
+
+        if self.epoch < mid:
+            r = self.epoch / mid
+            lr = self.annealing(self.min_lr, self.max_lr, r)
+        else:
+            r = (self.epoch - mid) / (self.max_steps - mid)
+            lr = self.annealing(self.max_lr, self.min_lr / 10, r)
+
+        for param_group in self.optimizer.param_groups:
+            param_group['lr'] = lr
+

@@ -334,7 +334,7 @@ class HierarchicalCNNClassificationModel(nn.Module):
         )
 
         self.global_step = 0
-        self.make_optimizer()
+        self.make_optimizer(max_steps=len(train_loader) * epochs)
 
         scores = []
         best_score = 0
@@ -377,7 +377,7 @@ class HierarchicalCNNClassificationModel(nn.Module):
 
         return scores
 
-    def make_optimizer(self):
+    def make_optimizer(self, max_steps):
 
         optimizer = OPTIMIZERS[self.config.train.optimizer]
         optimizer = optimizer(
@@ -386,7 +386,8 @@ class HierarchicalCNNClassificationModel(nn.Module):
             weight_decay=self.config.train.weight_decay
         )
         self.optimizer = optimizer
-        self.scheduler = make_scheduler(self.config.train.scheduler)(optimizer)
+        self.scheduler = make_scheduler(
+            self.config.train.scheduler, max_steps=max_steps)(optimizer)
 
     def load_best_model(self, fold):
 
