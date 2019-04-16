@@ -264,7 +264,6 @@ with Experiment({
                     train_df.labels.values[train]] + noisy_labels,
                 transform=Compose([
                     LoadAudio(),
-                    SampleSegment((0.5, 0.9)),
                     MapLabels(class_map=class_map),
                     MixUp(p=args.p_mixup),
                     audio_transform,
