@@ -1,11 +1,16 @@
 import random
+import math
 from functools import partial
 import json
 
+import librosa
 import numpy as np
 import torch
 
 from ops.audio import read_audio, compute_stft, trim_audio, mix_audio_and_labels
+
+
+SAMPLE_RATE = 44100
 
 
 class Augmentation:
@@ -91,6 +96,86 @@ class STFT:
 
         transformed = dict(inputs)
         transformed["stft"] = np.transpose(stft)
+
+        return transformed
+
+
+class AudioFeatures:
+
+    eps = 1e-4
+
+    def __init__(self, descriptor, verbose=True):
+
+        name, *args = descriptor.split("_")
+
+        self.feature_type = name
+
+        if name == "stft":
+
+            n_fft, hop_size = args
+            self.n_fft = int(n_fft)
+            self.hop_size = int(hop_size)
+
+            self.n_features = self.n_fft // 2 + 1
+            self.padding_value = math.log(self.eps)
+
+            if verbose:
+                print(
+                    "\nUsing STFT features with params:\n",
+                    "n_fft: {}, hop_size: {}".format(
+                        n_fft, hop_size
+                    )
+                )
+
+        elif name == "mel":
+
+            n_fft, hop_size, n_mel = args
+            self.n_fft = int(n_fft)
+            self.hop_size = int(hop_size)
+            self.n_mel = int(n_mel)
+
+            self.n_features = self.n_mel
+            self.padding_value = math.log(self.eps)
+
+            if verbose:
+                print(
+                    "\nUsing mel features with params:\n",
+                    "n_fft: {}, hop_size: {}, n_mel: {}".format(
+                        n_fft, hop_size, n_mel
+                    )
+                )
+
+    def __call__(self, dataset, **inputs):
+
+        transformed = dict(inputs)
+
+        if self.feature_type == "stft":
+
+            stft = compute_stft(
+                inputs["audio"],
+                window_size=self.n_fft, hop_size=self.hop_size,
+                eps=self.eps, log=True
+            )
+
+            transformed["signal"] = np.transpose(stft)
+
+        elif self.feature_type == "mel":
+
+            stft = compute_stft(
+                inputs["audio"],
+                window_size=self.n_fft, hop_size=self.hop_size,
+                eps=self.eps, log=False
+            )
+
+            filterbank = librosa.filters.mel(
+                sr=inputs["sr"], n_fft=self.n_fft, n_mels=self.n_mel,
+                fmin=5, fmax=None
+            ).astype(np.float32)
+
+            mel = filterbank.dot(stft)
+            mel = np.log(mel + self.eps)
+
+            transformed["signal"] = np.transpose(mel)
 
         return transformed
 

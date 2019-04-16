@@ -17,7 +17,7 @@ from networks.classifiers import HierarchicalCNNClassificationModel
 from ops.folds import train_validation_data
 from ops.transforms import (
     Compose, DropFields, LoadAudio,
-    STFT, MapLabels, RenameFields, MixUp)
+    AudioFeatures, MapLabels, RenameFields, MixUp)
 from ops.utils import load_json, get_class_names_from_classmap, lwlrap
 from ops.padding import make_collate_fn
 
@@ -102,11 +102,6 @@ parser.add_argument(
     choices=("cuda", "cpu")
 )
 parser.add_argument(
-    "--input_norm_type", type=str, required=True,
-    help="type of normalization applied on input",
-    choices=("bn", "ins")
-)
-parser.add_argument(
     "--num_conv_blocks", type=int, default=5,
     help="number of conv blocks"
 )
@@ -143,12 +138,8 @@ parser.add_argument(
     help="on which epoch to remove augmentations"
 )
 parser.add_argument(
-    "--n_fft", type=int, default=512,
-    help="number of fft bins"
-)
-parser.add_argument(
-    "--hop_size", type=int, default=128,
-    help="hop_size for stft-based features"
+    "--features", type=str, required=True,
+    help="feature descriptor"
 )
 parser.add_argument(
     "--optimizer", type=str, required=True,
@@ -179,6 +170,7 @@ args = parser.parse_args()
 
 class_map = load_json(args.classmap)
 
+audio_transform = AudioFeatures(args.features)
 
 with Experiment({
     "network": {
@@ -188,14 +180,12 @@ with Experiment({
         "growth_rate": args.growth_rate,
         "dropout": args.dropout,
         "output_dropout": args.output_dropout,
-        "input_norm_type": args.input_norm_type
     },
     "data": {
+        "features": args.features,
         "_n_folds": args.n_folds,
         "_kfold_seed": args.kfold_seed,
-        "n_fft": args.n_fft,
-        "hop_size": args.hop_size,
-        "_input_dim": args.n_fft // 2 + 1,
+        "_input_dim": audio_transform.n_features,
         "_n_classes": len(class_map),
         "_holdout_size": args.holdout_size,
         "p_mixup": args.p_mixup
@@ -276,9 +266,8 @@ with Experiment({
                     LoadAudio(),
                     MapLabels(class_map=class_map),
                     MixUp(p=args.p_mixup),
-                    STFT(n_fft=args.n_fft, hop_size=args.hop_size),
+                    audio_transform,
                     DropFields(("audio", "filename", "sr")),
-                    RenameFields({"stft": "signal"})
                 ]),
                 clean_transform=Compose([
                     LoadAudio(),
@@ -288,7 +277,7 @@ with Experiment({
             shuffle=True,
             drop_last=True,
             batch_size=config.train.batch_size,
-            collate_fn=make_collate_fn({"signal": math.log(STFT.eps)}),
+            collate_fn=make_collate_fn({"signal": audio_transform.padding_value}),
             **loader_kwargs
         )
 
@@ -301,14 +290,13 @@ with Experiment({
                 transform=Compose([
                     LoadAudio(),
                     MapLabels(class_map=class_map),
-                    STFT(n_fft=args.n_fft, hop_size=args.hop_size),
+                    audio_transform,
                     DropFields(("audio", "filename", "sr")),
-                    RenameFields({"stft": "signal"})
                 ])
             ),
             shuffle=False,
             batch_size=config.train.batch_size,
-            collate_fn=make_collate_fn({"signal": math.log(STFT.eps)}),
+            collate_fn=make_collate_fn({"signal": audio_transform.padding_value}),
             **loader_kwargs
         )
 
@@ -357,14 +345,13 @@ with Experiment({
                     for fname in test_df.fname.values],
                 transform=Compose([
                     LoadAudio(),
-                    STFT(n_fft=args.n_fft, hop_size=args.hop_size),
+                    audio_transform,
                     DropFields(("audio", "filename", "sr")),
-                    RenameFields({"stft": "signal"})
                 ])
             ),
             shuffle=False,
             batch_size=config.train.batch_size,
-            collate_fn=make_collate_fn({"signal": math.log(STFT.eps)}),
+            collate_fn=make_collate_fn({"signal": audio_transform.padding_value}),
             **loader_kwargs
         )
 
@@ -392,14 +379,13 @@ with Experiment({
                     transform=Compose([
                         LoadAudio(),
                         MapLabels(class_map),
-                        STFT(n_fft=args.n_fft, hop_size=args.hop_size),
+                        audio_transform,
                         DropFields(("audio", "filename", "sr")),
-                        RenameFields({"stft": "signal"})
                     ])
                 ),
                 shuffle=False,
                 batch_size=config.train.batch_size,
-                collate_fn=make_collate_fn({"signal": math.log(STFT.eps)}),
+                collate_fn=make_collate_fn({"signal": audio_transform.padding_value}),
                 **loader_kwargs
             )
 
