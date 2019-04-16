@@ -190,10 +190,12 @@ class SampleSegment(Augmentation):
     def __call__(self, dataset, **inputs):
 
         transformed = dict(inputs)
-        original_size = inputs["audio"].size
-        target_size = int(np.random.uniform(self.min, self.max) * original_size)
-        start = np.random.randint(original_size - target_size - 1)
-        transformed["audio"] = inputs["audio"][start:start+target_size]
+
+        if np.random.uniform() < self.p:
+            original_size = inputs["audio"].size
+            target_size = int(np.random.uniform(self.min, self.max) * original_size)
+            start = np.random.randint(original_size - target_size - 1)
+            transformed["audio"] = inputs["audio"][start:start+target_size]
 
         return transformed
 
