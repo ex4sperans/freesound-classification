@@ -137,6 +137,11 @@ class AudioFeatures:
             self.n_features = self.n_mel
             self.padding_value = math.log(self.eps)
 
+            self.filterbank = librosa.filters.mel(
+                sr=SAMPLE_RATE, n_fft=self.n_fft, n_mels=self.n_mel,
+                fmin=5, fmax=None
+            ).astype(np.float32)
+
             if verbose:
                 print(
                     "\nUsing mel features with params:\n",
@@ -167,15 +172,28 @@ class AudioFeatures:
                 eps=self.eps, log=False
             )
 
-            filterbank = librosa.filters.mel(
-                sr=inputs["sr"], n_fft=self.n_fft, n_mels=self.n_mel,
-                fmin=5, fmax=None
-            ).astype(np.float32)
-
-            mel = filterbank.dot(stft)
+            mel = self.filterbank.dot(stft)
             mel = np.log(mel + self.eps)
 
             transformed["signal"] = np.transpose(mel)
+
+        return transformed
+
+
+class SampleSegment(Augmentation):
+
+    def __init__(self, ratio=(0.3, 0.9), p=1.0):
+
+        self.min, self.max = ratio
+        self.p = 1.0
+
+    def __call__(self, dataset, **inputs):
+
+        transformed = dict(inputs)
+        original_size = inputs["audio"].size
+        target_size = int(np.random.uniform(self.min, self.max) * original_size)
+        start = np.random.randint(original_size - target_size - 1)
+        transformed["audio"] = inputs["audio"][start:start+target_size]
 
         return transformed
 

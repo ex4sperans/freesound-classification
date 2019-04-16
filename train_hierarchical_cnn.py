@@ -17,7 +17,7 @@ from networks.classifiers import HierarchicalCNNClassificationModel
 from ops.folds import train_validation_data
 from ops.transforms import (
     Compose, DropFields, LoadAudio,
-    AudioFeatures, MapLabels, RenameFields, MixUp)
+    AudioFeatures, MapLabels, RenameFields, MixUp, SampleSegment)
 from ops.utils import load_json, get_class_names_from_classmap, lwlrap
 from ops.padding import make_collate_fn
 
@@ -264,6 +264,7 @@ with Experiment({
                     train_df.labels.values[train]] + noisy_labels,
                 transform=Compose([
                     LoadAudio(),
+                    SampleSegment((0.5, 0.9)),
                     MapLabels(class_map=class_map),
                     MixUp(p=args.p_mixup),
                     audio_transform,
