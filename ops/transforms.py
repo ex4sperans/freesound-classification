@@ -200,6 +200,27 @@ class SampleSegment(Augmentation):
         return transformed
 
 
+class SampleLongAudio:
+
+    def __init__(self, max_length):
+
+        self.max_length = max_length
+
+    def __call__(self, dataset, **inputs):
+
+        transformed = dict(inputs)
+
+        if (inputs["audio"].size / inputs["sr"]) > self.max_length:
+
+            max_length = self.max_length * inputs["sr"]
+
+            start = np.random.randint(
+                inputs["audio"].size - max_length - 1)
+            transformed["audio"] = inputs["audio"][start:start+max_length]
+
+        return transformed
+
+
 class OneOf:
 
     def __init__(self, transforms):
