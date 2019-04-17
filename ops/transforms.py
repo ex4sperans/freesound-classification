@@ -214,8 +214,7 @@ class SampleLongAudio:
 
             max_length = self.max_length * inputs["sr"]
 
-            start = np.random.randint(
-                inputs["audio"].size - max_length - 1)
+            start = np.random.randint(0, inputs["audio"].size - max_length)
             transformed["audio"] = inputs["audio"][start:start+max_length]
 
         return transformed
