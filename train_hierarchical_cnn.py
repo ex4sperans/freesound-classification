@@ -17,7 +17,8 @@ from networks.classifiers import HierarchicalCNNClassificationModel
 from ops.folds import train_validation_data
 from ops.transforms import (
     Compose, DropFields, LoadAudio,
-    AudioFeatures, MapLabels, RenameFields, MixUp, SampleSegment)
+    AudioFeatures, MapLabels, RenameFields,
+    MixUp, SampleSegment, SampleLongAudio)
 from ops.utils import load_json, get_class_names_from_classmap, lwlrap
 from ops.padding import make_collate_fn
 
@@ -67,6 +68,10 @@ parser.add_argument(
 parser.add_argument(
     "--batch_size", type=int, default=64,
     help="minibatch size"
+)
+parser.add_argument(
+    "--max_audio_length", type=int, default=10,
+    help="max audio length in seconds. For longer clips are sampled"
 )
 parser.add_argument(
     "--lr", default=0.01, type=float,
@@ -188,7 +193,8 @@ with Experiment({
         "_input_dim": audio_transform.n_features,
         "_n_classes": len(class_map),
         "_holdout_size": args.holdout_size,
-        "p_mixup": args.p_mixup
+        "p_mixup": args.p_mixup,
+        "max_audio_length": args.max_audio_length
     },
     "train": {
         "accumulation_steps": args.accumulation_steps,
@@ -264,6 +270,7 @@ with Experiment({
                     train_df.labels.values[train]] + noisy_labels,
                 transform=Compose([
                     LoadAudio(),
+                    SampleLongAudio(max_length=args.max_audio_length),
                     MapLabels(class_map=class_map),
                     MixUp(p=args.p_mixup),
                     audio_transform,
