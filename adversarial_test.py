@@ -145,6 +145,7 @@ train_loader = torch.utils.data.DataLoader(
     shuffle=True,
     drop_last=True,
     batch_size=args.batch_size,
+    num_workers=4,
     collate_fn=make_collate_fn({"signal": audio_transform.padding_value}),
 )
 
@@ -165,6 +166,7 @@ validation_loader = torch.utils.data.DataLoader(
     shuffle=False,
     drop_last=False,
     batch_size=args.batch_size,
+    num_workers=4,
     collate_fn=make_collate_fn({"signal": audio_transform.padding_value}),
 )
 
