@@ -61,6 +61,60 @@ class MixUp(Augmentation):
         return transformed
 
 
+class FlipAudio(Augmentation):
+
+    def __init__(self, p):
+
+        self.p = p
+
+    def __call__(self, dataset, **inputs):
+
+        transformed = dict(inputs)
+
+        if np.random.uniform() < self.p:
+            transformed["audio"] = np.flipud(inputs["audio"])
+
+        return transformed
+
+
+class StretchAudio(Augmentation):
+
+    def __init__(self, p, factors=(7/10, 10/7)):
+
+        self.p = p
+        self.factors = factors
+
+    def __call__(self, dataset, **inputs):
+
+        transformed = dict(inputs)
+
+        if np.random.uniform() < self.p:
+            rate = np.random.uniform(*self.factors)
+            transformed["audio"] = librosa.effects.time_stretch(
+                inputs["audio"], rate=rate)
+
+        return transformed
+
+
+class PitchShift(Augmentation):
+
+    def __init__(self, p, steps=2):
+
+        self.p = p
+        self.steps = steps
+
+    def __call__(self, dataset, **inputs):
+
+        transformed = dict(inputs)
+
+        if np.random.uniform() < self.p:
+            n_steps = np.random.uniform(-self.steps, self.steps)
+            transformed["audio"] = librosa.effects.pitch_shift(
+                inputs["audio"], sr=inputs["sr"], n_steps=n_steps)
+
+        return transformed
+
+
 class LoadAudio:
 
     def __init__(self):
