@@ -9,6 +9,7 @@ import tqdm
 import pandas as pd
 import numpy as np
 import torch
+from matplotlib import pyplot as plt
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import roc_auc_score
 
@@ -72,6 +73,14 @@ parser.add_argument(
     "--max_samples", type=int,
     help="maximum number of samples to use"
 )
+parser.add_argument(
+    "--features", type=str, required=True,
+    help="feature descriptor"
+)
+parser.add_argument(
+    "--max_audio_length", type=int, default=10,
+    help="max audio length in seconds. For longer clips are sampled"
+)
 
 args = parser.parse_args()
 
@@ -91,7 +100,7 @@ labels = np.concatenate([np.ones(len(train_df)), np.zeros(len(test_df))])
 train_fnames, val_fnames, train_labels, val_labels = train_test_split(
     fnames, labels, test_size=args.val_size, shuffle=True)
 
-audio_transform = AudioFeatures("stft_256_64")
+audio_transform = AudioFeatures(args.features)
 
 
 class Model(torch.nn.Module):
@@ -104,28 +113,32 @@ class Model(torch.nn.Module):
             torch.nn.Conv1d(audio_transform.n_features, 32, kernel_size=1),
             ResnetBlock(32),
             torch.nn.MaxPool1d(kernel_size=2, stride=2),
-            torch.nn.Conv1d(32, 64, kernel_size=1),
-            ResnetBlock(64),
+            torch.nn.BatchNorm1d(32),
+            torch.nn.Conv1d(32, 32, kernel_size=3),
+            ResnetBlock(32),
             torch.nn.MaxPool1d(kernel_size=2, stride=2),
-            torch.nn.Conv1d(64, 128, kernel_size=1),
-            ResnetBlock(128)
+            torch.nn.BatchNorm1d(32),
+            torch.nn.Conv1d(32, 64, kernel_size=3),
+            ResnetBlock(64)
         )
 
         self.pool = torch.nn.AdaptiveMaxPool1d(1)
 
         self.classifier = torch.nn.Sequential(
-            torch.nn.BatchNorm1d(128),
-            torch.nn.Linear(128, 1)
+            torch.nn.BatchNorm1d(64),
+            torch.nn.Conv1d(64, 1, kernel_size=1)
         )
 
     def forward(self, x):
 
         x = x.permute(0, 2, 1)
         x = self.features(x)
-        x = self.pool(x).squeeze(-1)
         x = self.classifier(x)
+        x = torch.sigmoid(x)
+        nonpooled = x
+        x = self.pool(x).squeeze(-1)
 
-        return torch.sigmoid(x)
+        return x.squeeze(1), nonpooled.squeeze(1)
 
 
 train_loader = torch.utils.data.DataLoader(
@@ -134,6 +147,7 @@ train_loader = torch.utils.data.DataLoader(
         labels=train_labels,
         transform=Compose([
             LoadAudio(),
+            SampleLongAudio(max_length=args.max_audio_length),
             audio_transform,
             RenameFields({"raw_labels": "labels"}),
             DropFields(("audio", "filename", "sr")),
@@ -155,6 +169,7 @@ validation_loader = torch.utils.data.DataLoader(
         labels=val_labels,
         transform=Compose([
             LoadAudio(),
+            SampleLongAudio(max_length=args.max_audio_length),
             audio_transform,
             RenameFields({"raw_labels": "labels"}),
             DropFields(("audio", "filename", "sr")),
@@ -190,7 +205,7 @@ for epoch in range(args.epochs):
                 sample["labels"].to(args.device).float()
             )
 
-            probs = model(signal).squeeze(-1)
+            probs, nonpooled = model(signal)
 
             optimizer.zero_grad()
             loss = torch.nn.functional.binary_cross_entropy(probs, labels)
@@ -203,19 +218,53 @@ for epoch in range(args.epochs):
     val_probs = []
     val_labels = []
 
-    for sample in validation_loader:
+    with torch.no_grad():
 
-        signal, labels = (
-            sample["signal"].to(args.device),
-            sample["labels"].to(args.device).float()
-        )
+        for sample in validation_loader:
 
-        probs = model(signal).squeeze(-1)
+            signal, labels = (
+                sample["signal"].to(args.device),
+                sample["labels"].to(args.device).float()
+            )
 
-        val_probs.extend(probs.data.cpu().numpy())
-        val_labels.extend(labels.data.cpu().numpy())
+            probs, nonpooled = model(signal)
+
+            val_probs.extend(probs.data.cpu().numpy())
+            val_labels.extend(labels.data.cpu().numpy())
 
     auc = roc_auc_score(val_labels, val_probs)
 
     print("\nEpoch: {}, AUC: {}".format(epoch, auc))
+
+
+with torch.no_grad():
+
+    sample = next(iter(validation_loader))
+    signal, labels = (
+        sample["signal"].to(args.device),
+        sample["labels"].to(args.device).float()
+    )
+
+    probs, nonpooled = model(signal)
+
+    nonpooled = nonpooled.data.cpu().numpy()
+    signal = signal.data.cpu().numpy()
+    labels = labels.data.cpu().numpy()
+
+
+directory = "plots/"
+os.makedirs(directory, exist_ok=True)
+
+for k in range(len(signal)):
+
+    fig = plt.figure(figsize=(20, 7))
+    fig.suptitle(str(labels[k]))
+    ax = fig.add_subplot(211)
+    ax.imshow(np.transpose(signal[k]))
+    ax = fig.add_subplot(212)
+    ax.plot(nonpooled[k])
+    ax.set_ylim(0, 1)
+
+    fig.savefig(os.path.join(directory, "plot_{}.png".format(k)))
+
 
