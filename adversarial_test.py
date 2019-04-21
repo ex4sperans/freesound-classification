@@ -81,6 +81,11 @@ parser.add_argument(
     "--max_audio_length", type=int, default=10,
     help="max audio length in seconds. For longer clips are sampled"
 )
+parser.add_argument(
+    "--batches_to_save", type=int, default=3,
+    help="how many batches to save"
+)
+
 
 args = parser.parse_args()
 
@@ -237,34 +242,37 @@ for epoch in range(args.epochs):
     print("\nEpoch: {}, AUC: {}".format(epoch, auc))
 
 
-with torch.no_grad():
-
-    sample = next(iter(validation_loader))
-    signal, labels = (
-        sample["signal"].to(args.device),
-        sample["labels"].to(args.device).float()
-    )
-
-    probs, nonpooled = model(signal)
-
-    nonpooled = nonpooled.data.cpu().numpy()
-    signal = signal.data.cpu().numpy()
-    labels = labels.data.cpu().numpy()
-
-
+loader = iter(validation_loader)
 directory = "plots/"
 os.makedirs(directory, exist_ok=True)
 
-for k in range(len(signal)):
+for n in range(args.batches_to_save):
 
-    fig = plt.figure(figsize=(20, 7))
-    fig.suptitle(str(labels[k]))
-    ax = fig.add_subplot(211)
-    ax.imshow(np.transpose(signal[k]))
-    ax = fig.add_subplot(212)
-    ax.plot(nonpooled[k])
-    ax.set_ylim(0, 1)
+    with torch.no_grad():
 
-    fig.savefig(os.path.join(directory, "plot_{}.png".format(k)))
+        sample = next(loader)
+        signal, labels = (
+            sample["signal"].to(args.device),
+            sample["labels"].to(args.device).float()
+        )
+
+        probs, nonpooled = model(signal)
+
+        nonpooled = nonpooled.data.cpu().numpy()
+        signal = signal.data.cpu().numpy()
+        labels = labels.data.cpu().numpy()
+
+    for k in range(len(signal)):
+
+        fig = plt.figure(figsize=(20, 7))
+        fig.suptitle(str(labels[k]))
+        ax = fig.add_subplot(211)
+        ax.imshow(np.transpose(signal[k]))
+        ax = fig.add_subplot(212)
+        ax.plot(nonpooled[k])
+        ax.set_ylim(0, 1)
+        ax.set_xlim(0, len(nonpooled[k]) - 1)
+
+        fig.savefig(os.path.join(directory, "plot_{}_{}.png".format(n, k)))
 
 
