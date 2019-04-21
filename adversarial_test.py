@@ -274,5 +274,6 @@ for n in range(args.batches_to_save):
         ax.set_xlim(0, len(nonpooled[k]) - 1)
 
         fig.savefig(os.path.join(directory, "plot_{}_{}.png".format(n, k)))
+        plt.close()
 
 
