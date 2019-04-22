@@ -85,7 +85,10 @@ parser.add_argument(
     "--batches_to_save", type=int, default=3,
     help="how many batches to save"
 )
-
+parser.add_argument(
+    "--classmap", required=True, type=str,
+    help="path to class map json"
+)
 
 args = parser.parse_args()
 
@@ -96,10 +99,12 @@ if args.max_samples:
     train_df = train_df.sample(args.max_samples).reset_index(drop=True)
     test_df = test_df.sample(args.max_samples).reset_index(drop=True)
 
-fnames = np.concatenate([
-    [os.path.join(args.train_data_dir, fname) for fname in train_df.fname.values],
-    [os.path.join(args.test_data_dir, fname) for fname in test_df.fname.values]
-])
+all_train_fnames = [
+    os.path.join(args.train_data_dir, fname) for fname in train_df.fname.values]
+all_test_fnames = [
+    os.path.join(args.test_data_dir, fname) for fname in test_df.fname.values]
+
+fnames = np.concatenate([all_train_fnames, all_test_fnames])
 labels = np.concatenate([np.ones(len(train_df)), np.zeros(len(test_df))])
 
 train_fnames, val_fnames, train_labels, val_labels = train_test_split(
@@ -201,6 +206,8 @@ for epoch in range(args.epochs):
         .format(epoch=epoch)
     )
 
+    model.train()
+
     with tqdm.tqdm(total=len(train_loader), ncols=80) as pb:
 
         for sample in train_loader:
@@ -219,6 +226,8 @@ for epoch in range(args.epochs):
 
             pb.update()
             pb.set_description("Loss: {:.4f}".format(loss.item()))
+
+    model.eval()
 
     val_probs = []
     val_labels = []
@@ -241,7 +250,9 @@ for epoch in range(args.epochs):
 
     print("\nEpoch: {}, AUC: {}".format(epoch, auc))
 
+model.eval()
 
+# plot probabilities
 loader = iter(validation_loader)
 directory = "plots/"
 os.makedirs(directory, exist_ok=True)
@@ -276,4 +287,62 @@ for n in range(args.batches_to_save):
         fig.savefig(os.path.join(directory, "plot_{}_{}.png".format(n, k)))
         plt.close()
 
+# compute average scores for classes
+
+class_map = load_json(args.classmap)
+
+names_with_labels = [
+    fname for fname in val_fnames if fname in all_train_fnames]
+labels = pd.DataFrame({
+    "fname": [os.path.basename(fname) for fname in names_with_labels]}).merge(
+        train_df, on="fname", how="left").labels.values
+
+loader = torch.utils.data.DataLoader(
+    SoundDataset(
+        audio_files=names_with_labels,
+        labels=[item.split(",") for item in labels],
+        transform=Compose([
+            LoadAudio(),
+            MapLabels(class_map),
+            SampleLongAudio(max_length=args.max_audio_length),
+            audio_transform,
+            DropFields(("audio", "filename", "sr")),
+        ])
+    ),
+    shuffle=False,
+    drop_last=False,
+    batch_size=args.batch_size,
+    num_workers=4,
+    collate_fn=make_collate_fn({"signal": audio_transform.padding_value}),
+)
+
+all_probs = []
+all_labels = []
+
+with torch.no_grad():
+
+    for sample in loader:
+
+        signal, labels = (
+            sample["signal"].to(args.device),
+            sample["labels"].to(args.device).float()
+        )
+
+        probs, nonpooled = model(signal)
+
+        all_probs.extend(probs.data.cpu().numpy())
+        all_labels.extend(labels.data.cpu().numpy())
+
+all_probs = np.array(all_probs)
+all_labels = np.array(all_labels)
+
+scores = all_labels * np.expand_dims(all_probs, -1)
+mean_scores = scores.mean(axis=0)
+
+classnames = get_class_names_from_classmap(class_map)
+
+pd.options.display.max_rows = 100
+
+print()
+print(pd.DataFrame({"classname": classnames, "scores": mean_scores}))
 
