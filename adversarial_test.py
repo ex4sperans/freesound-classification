@@ -337,7 +337,7 @@ all_probs = np.array(all_probs)
 all_labels = np.array(all_labels)
 
 scores = all_labels * np.expand_dims(all_probs, -1)
-mean_scores = scores.mean(axis=0)
+mean_scores = scores.sum(axis=0) / all_labels.sum(axis=0)
 
 classnames = get_class_names_from_classmap(class_map)
 
