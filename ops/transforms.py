@@ -3,6 +3,7 @@ import math
 from functools import partial
 import json
 
+import pysndfx
 import librosa
 import numpy as np
 import torch
@@ -77,40 +78,29 @@ class FlipAudio(Augmentation):
         return transformed
 
 
-class StretchAudio(Augmentation):
+class AudioAugmentation(Augmentation):
 
-    def __init__(self, p, factors=(7/10, 10/7)):
+    def __init__(self, p):
 
         self.p = p
-        self.factors = factors
 
     def __call__(self, dataset, **inputs):
 
         transformed = dict(inputs)
 
         if np.random.uniform() < self.p:
-            rate = np.random.uniform(*self.factors)
-            transformed["audio"] = librosa.effects.time_stretch(
-                inputs["audio"], rate=rate)
-
-        return transformed
-
-
-class PitchShift(Augmentation):
-
-    def __init__(self, p, steps=2):
-
-        self.p = p
-        self.steps = steps
-
-    def __call__(self, dataset, **inputs):
-
-        transformed = dict(inputs)
-
-        if np.random.uniform() < self.p:
-            n_steps = np.random.uniform(-self.steps, self.steps)
-            transformed["audio"] = librosa.effects.pitch_shift(
-                inputs["audio"], sr=inputs["sr"], n_steps=n_steps)
+            effects_chain = (
+                pysndfx.AudioEffectsChain()
+                .reverb(
+                    reverberance=random.randrange(50),
+                    room_scale=random.randrange(50),
+                    stereo_depth=random.randrange(50)
+                )
+                .pitch(shift=random.randrange(-300, 300))
+                .overdrive(gain=random.randrange(2, 10))
+                .speed(random.uniform(0.9, 1.1))
+            )
+            transformed["audio"] = effects_chain(inputs["audio"])
 
         return transformed
 

@@ -19,7 +19,7 @@ from ops.transforms import (
     Compose, DropFields, LoadAudio,
     AudioFeatures, MapLabels, RenameFields,
     MixUp, SampleSegment, SampleLongAudio,
-    StretchAudio, PitchShift, FlipAudio)
+    AudioAugmentation)
 from ops.utils import load_json, get_class_names_from_classmap, lwlrap
 from ops.padding import make_collate_fn
 
@@ -140,6 +140,10 @@ parser.add_argument(
     help="probability of the mixup augmentation"
 )
 parser.add_argument(
+    "--p_aug", type=float, default=0.0,
+    help="probability of audio augmentation"
+)
+parser.add_argument(
     "--switch_off_augmentations_on", type=int, default=20,
     help="on which epoch to remove augmentations"
 )
@@ -195,6 +199,7 @@ with Experiment({
         "_n_classes": len(class_map),
         "_holdout_size": args.holdout_size,
         "p_mixup": args.p_mixup,
+        "p_aug": args.p_aug,
         "max_audio_length": args.max_audio_length
     },
     "train": {
@@ -274,6 +279,7 @@ with Experiment({
                     SampleLongAudio(max_length=args.max_audio_length),
                     MapLabels(class_map=class_map),
                     MixUp(p=args.p_mixup),
+                    AudioAugmentation(p=args.p_aug),
                     audio_transform,
                     DropFields(("audio", "filename", "sr")),
                 ]),
