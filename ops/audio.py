@@ -31,6 +31,8 @@ def mix_audio_and_labels(first_audio, second_audio, first_labels, second_labels)
 
     new_labels = np.clip(first_labels + second_labels, 0, 1)
 
+    a = np.random.uniform(0.4, 0.6)
+
     shorter, longer = first_audio, second_audio
 
     if shorter.size == longer.size:
@@ -42,8 +44,7 @@ def mix_audio_and_labels(first_audio, second_audio, first_labels, second_labels)
     start = random.randint(0, longer.size - 1 - shorter.size)
     end = start + shorter.size
 
-
-    longer[start:end] = shorter
-    longer /= 2     # average
+    longer *= a
+    longer[start:end] =+ shorter * (1 - a)
 
     return longer, new_labels
