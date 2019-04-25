@@ -45,24 +45,26 @@ class ResnetBlock(nn.Module):
         self.bn2 = nn.BatchNorm1d(depth)
         self.conv3 = nn.Conv1d(depth, depth, kernel_size=1)
         self.bn3 = nn.BatchNorm1d(depth)
-        self.relu = nn.ReLU(inplace=True)
+        self.prelu1 = nn.PReLU(depth)
+        self.prelu2 = nn.PReLU(depth)
+        self.prelu3 = nn.PReLU(depth)
 
     def forward(self, x):
         identity = x
 
         out = self.conv1(x)
         out = self.bn1(out)
-        out = self.relu(out)
+        out = self.prelu1(out)
 
         out = self.conv2(out)
         out = self.bn2(out)
-        out = self.relu(out)
+        out = self.prelu2(out)
 
         out = self.conv3(out)
         out = self.bn3(out)
 
         out += identity
-        out = self.relu(out)
+        out = self.prelu3(out)
 
         return out
 
@@ -91,7 +93,7 @@ class HierarchicalCNNClassificationModel(nn.Module):
             if k >= self.config.network.start_deep_supervision_on:
                 total_depth += depth
 
-            modules = [nn.BatchNorm1d(input_size)] if not k else []
+            modules = [nn.BatchNorm1d(input_size)]
             modules.extend([
                 nn.Conv1d(
                     input_size,
@@ -101,7 +103,7 @@ class HierarchicalCNNClassificationModel(nn.Module):
                 ),
                 nn.MaxPool1d(kernel_size=2, stride=2),
                 nn.BatchNorm1d(depth),
-                nn.ReLU(inplace=True),
+                nn.PReLU(depth),
                 ConvLockedDropout(self.config.network.dropout),
                 ResnetBlock(depth)
             ])
