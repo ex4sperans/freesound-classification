@@ -69,6 +69,41 @@ class ResnetBlock(nn.Module):
         return out
 
 
+class ResnetBlock2d(nn.Module):
+
+    def __init__(self, depth):
+        super().__init__()
+
+        self.conv1 = nn.Conv2d(depth, depth, kernel_size=1)
+        self.bn1 = nn.BatchNorm2d(depth)
+        self.conv2 = nn.Conv2d(depth, depth, kernel_size=3, padding=1)
+        self.bn2 = nn.BatchNorm2d(depth)
+        self.conv3 = nn.Conv2d(depth, depth, kernel_size=1)
+        self.bn3 = nn.BatchNorm2d(depth)
+        self.prelu1 = nn.PReLU(depth)
+        self.prelu2 = nn.PReLU(depth)
+        self.prelu3 = nn.PReLU(depth)
+
+    def forward(self, x):
+        identity = x
+
+        out = self.conv1(x)
+        out = self.bn1(out)
+        out = self.prelu1(out)
+
+        out = self.conv2(out)
+        out = self.bn2(out)
+        out = self.prelu2(out)
+
+        out = self.conv3(out)
+        out = self.bn3(out)
+
+        out += identity
+        out = self.prelu3(out)
+
+        return out
+
+
 class HierarchicalCNNClassificationModel(nn.Module):
 
     def __init__(self, experiment, device="cuda"):
@@ -416,35 +451,73 @@ class TwoDimensionalCNNClassificationModel(nn.Module):
         self.experiment = experiment
         self.config = experiment.config
 
-        self.input_bn = nn.BatchNorm2d(1)
+        self.conv_modules = torch.nn.ModuleList()
 
-        if self.config.network.backbone == "resnet34":
-            self.backbone = resnet34(pretrained=None)
-            self.backbone.conv1 = nn.Conv2d(
-                1, 64, kernel_size=7,
-                stride=2, padding=3,
-                bias=False)
+        total_depth = 0
+
+        for k in range(self.config.network.num_conv_blocks):
+
+            input_size = 2 if not k else depth
+            depth = int(
+                self.config.network.growth_rate ** k
+                * self.config.network.conv_base_depth)
+
+            if k >= self.config.network.start_deep_supervision_on:
+                total_depth += depth
+
+            modules = [nn.BatchNorm2d(input_size)]
+            modules.extend([
+                nn.Conv2d(
+                    input_size,
+                    depth,
+                    kernel_size=3,
+                    padding=0
+                ),
+                nn.MaxPool2d(kernel_size=2, stride=2),
+                nn.BatchNorm2d(depth),
+                nn.PReLU(depth),
+                ResnetBlock2d(depth)
+            ])
+
+            self.conv_modules.append(nn.Sequential(*modules))
 
         self.global_maxpool = nn.AdaptiveMaxPool2d(1)
 
-        total_depth = self.backbone.last_linear.in_features
-
         self.output_transform = nn.Sequential(
-            nn.BatchNorm2d(total_depth),
-            nn.Dropout2d(p=self.config.network.output_dropout),
-            nn.Conv2d(total_depth, self.config.data._n_classes, kernel_size=1)
+            nn.BatchNorm1d(total_depth),
+            nn.Dropout(p=self.config.network.output_dropout),
+            nn.Linear(total_depth, self.config.data._n_classes)
         )
 
         self.to(self.device)
 
+    def _add_frequency_encoding(self, x):
+        n, d, h, w = x.size()
+
+        vertical = torch.linspace(-1, 1, h, device=x.device).view(1, 1, -1, 1)
+        vertical = vertical.repeat(n, 1, 1, w)
+
+        x = torch.cat([x, vertical], dim=1)
+
+        return x
+
     def forward(self, signal):
 
         signal = signal.unsqueeze(1)
-        signal = self.input_bn(signal)
+        signal = signal.permute(0, 1, 3, 2)
+        signal = self._add_frequency_encoding(signal)
 
-        features = self.backbone.features(signal)
+        features = []
+
+        h = signal
+        for k, module in enumerate(self.conv_modules):
+            h = module(h)
+            if k >= self.config.network.start_deep_supervision_on:
+                features.append(self.global_maxpool(h).squeeze(-1).squeeze(-1))
+
+        features = torch.cat(features, -1)
+
         class_logits = self.output_transform(features)
-        class_logits = self.global_maxpool(class_logits).squeeze(-1).squeeze(-1)
 
         r = dict(
             class_logits=class_logits

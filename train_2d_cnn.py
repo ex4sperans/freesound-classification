@@ -18,7 +18,8 @@ from ops.folds import train_validation_data
 from ops.transforms import (
     Compose, DropFields, LoadAudio,
     AudioFeatures, MapLabels, RenameFields,
-    MixUp, SampleSegment, SampleLongAudio)
+    MixUp, SampleSegment, SampleLongAudio,
+    AudioAugmentation)
 from ops.utils import load_json, get_class_names_from_classmap, lwlrap
 from ops.padding import make_collate_fn
 
@@ -70,8 +71,8 @@ parser.add_argument(
     help="minibatch size"
 )
 parser.add_argument(
-    "--test_batch_size", type=int, default=32,
-    help="batch size used in prediction time"
+    "--max_audio_length", type=int, default=10,
+    help="max audio length in seconds. For longer clips are sampled"
 )
 parser.add_argument(
     "--lr", default=0.01, type=float,
@@ -107,12 +108,24 @@ parser.add_argument(
     choices=("cuda", "cpu")
 )
 parser.add_argument(
-    "--weight_decay", type=float, default=1e-5,
-    help="weight decay"
+    "--num_conv_blocks", type=int, default=5,
+    help="number of conv blocks"
 )
 parser.add_argument(
-    "--backbone", type=str, required=True,
-    help="which backbone to use"
+    "--start_deep_supervision_on", type=int, default=2,
+    help="from which layer to start aggregating features for classification"
+)
+parser.add_argument(
+    "--conv_base_depth", type=int, default=64,
+    help="base depth for conv layers"
+)
+parser.add_argument(
+    "--growth_rate", type=float, default=2,
+    help="how quickly to increase the number of units as a function of layer"
+)
+parser.add_argument(
+    "--weight_decay", type=float, default=1e-5,
+    help="weight decay"
 )
 parser.add_argument(
     "--output_dropout", type=float, default=0.0,
@@ -123,16 +136,16 @@ parser.add_argument(
     help="probability of the mixup augmentation"
 )
 parser.add_argument(
+    "--p_aug", type=float, default=0.0,
+    help="probability of audio augmentation"
+)
+parser.add_argument(
     "--switch_off_augmentations_on", type=int, default=20,
     help="on which epoch to remove augmentations"
 )
 parser.add_argument(
     "--features", type=str, required=True,
     help="feature descriptor"
-)
-parser.add_argument(
-    "--max_audio_length", type=int, default=10,
-    help="max audio length in seconds. For longer clips are sampled"
 )
 parser.add_argument(
     "--optimizer", type=str, required=True,
@@ -156,7 +169,7 @@ parser.add_argument(
     help="number of workers for data loader",
 )
 parser.add_argument(
-    "--label", type=str, default="2d_cnn_classifier",
+    "--label", type=str, default="hierarchical_cnn_classifier",
     help="optional label",
 )
 args = parser.parse_args()
@@ -167,7 +180,10 @@ audio_transform = AudioFeatures(args.features)
 
 with Experiment({
     "network": {
-        "backbone": args.backbone,
+        "num_conv_blocks": args.num_conv_blocks,
+        "start_deep_supervision_on": args.start_deep_supervision_on,
+        "conv_base_depth": args.conv_base_depth,
+        "growth_rate": args.growth_rate,
         "output_dropout": args.output_dropout,
     },
     "data": {
@@ -178,6 +194,7 @@ with Experiment({
         "_n_classes": len(class_map),
         "_holdout_size": args.holdout_size,
         "p_mixup": args.p_mixup,
+        "p_aug": args.p_aug,
         "max_audio_length": args.max_audio_length
     },
     "train": {
@@ -190,9 +207,6 @@ with Experiment({
         "_save_every": args.save_every,
         "weight_decay": args.weight_decay,
         "switch_off_augmentations_on": args.switch_off_augmentations_on
-    },
-    "prediction": {
-        "_test_batch_size": args.test_batch_size
     },
     "label": args.label
 }) as experiment:
@@ -260,11 +274,13 @@ with Experiment({
                     SampleLongAudio(max_length=args.max_audio_length),
                     MapLabels(class_map=class_map),
                     MixUp(p=args.p_mixup),
+                    AudioAugmentation(p=args.p_aug),
                     audio_transform,
                     DropFields(("audio", "filename", "sr")),
                 ]),
                 clean_transform=Compose([
                     LoadAudio(),
+                    SampleLongAudio(max_length=args.max_audio_length),
                     MapLabels(class_map=class_map),
                 ])
             ),
@@ -289,12 +305,13 @@ with Experiment({
                 ])
             ),
             shuffle=False,
-            batch_size=config.prediction._test_batch_size,
+            batch_size=config.train.batch_size,
             collate_fn=make_collate_fn({"signal": audio_transform.padding_value}),
             **loader_kwargs
         )
 
-        model = TwoDimensionalCNNClassificationModel(experiment, device=args.device)
+        model = TwoDimensionalCNNClassificationModel(
+            experiment, device=args.device)
 
         scores = model.fit_validate(
             train_loader, valid_loader,
@@ -344,7 +361,7 @@ with Experiment({
                 ])
             ),
             shuffle=False,
-            batch_size=config.prediction._test_batch_size,
+            batch_size=config.train.batch_size,
             collate_fn=make_collate_fn({"signal": audio_transform.padding_value}),
             **loader_kwargs
         )
@@ -378,7 +395,7 @@ with Experiment({
                     ])
                 ),
                 shuffle=False,
-                batch_size=config.prediction._test_batch_size,
+                batch_size=config.train.batch_size,
                 collate_fn=make_collate_fn({"signal": audio_transform.padding_value}),
                 **loader_kwargs
             )
