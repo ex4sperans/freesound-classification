@@ -169,7 +169,7 @@ parser.add_argument(
     help="number of workers for data loader",
 )
 parser.add_argument(
-    "--label", type=str, default="hierarchical_cnn_classifier",
+    "--label", type=str, default="2d_cnn",
     help="optional label",
 )
 args = parser.parse_args()
