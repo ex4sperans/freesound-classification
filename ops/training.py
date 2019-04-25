@@ -7,7 +7,7 @@ from torch.optim.lr_scheduler import StepLR, CosineAnnealingLR, _LRScheduler
 
 
 OPTIMIZERS = {
-    "adam": torch.optim.Adam,
+    "adam": partial(torch.optim.Adam, amsgrad=True),
     "momentum": partial(torch.optim.SGD, momentum=0.9, nesterov=True)
 }
 
