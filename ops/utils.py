@@ -55,4 +55,6 @@ def plot_umap(vectors, labels, frames_per_example=3):
 
     image = np.array(fig.canvas.renderer._renderer)
 
+    plt.close()
+
     return image
