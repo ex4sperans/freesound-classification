@@ -246,6 +246,7 @@ with Experiment({
                 transform=Compose([
                     LoadAudio(),
                     MapLabels(class_map=class_map),
+                    SampleLongAudio(max_length=args.max_audio_length),
                     audio_transform,
                     DropFields(("audio", "filename", "sr")),
                 ])
