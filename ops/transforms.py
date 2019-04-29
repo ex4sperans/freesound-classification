@@ -194,6 +194,17 @@ class AudioFeatures:
                     )
                 )
 
+        elif name == "raw":
+
+            self.n_features = 1
+            self.padding_value = 0.0
+
+            if verbose:
+                print(
+                    "\nUsing raw waveform features."
+                )
+
+
     def __call__(self, dataset, **inputs):
 
         transformed = dict(inputs)
@@ -220,6 +231,9 @@ class AudioFeatures:
             mel = np.log(mel + self.eps)
 
             transformed["signal"] = np.transpose(mel)
+
+        elif self.feature_type == "raw":
+            transformed["signal"] = np.expand_dims(inputs["audio"], -1)
 
         return transformed
 
