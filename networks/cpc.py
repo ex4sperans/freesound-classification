@@ -17,6 +17,19 @@ from networks.losses import binary_cross_entropy, focal_loss, lsep_loss
 from ops.utils import plot_projection
 
 
+class CausalConv1d(nn.Module):
+
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1):
+        super().__init__()
+        self.kernel_size = kernel_size
+        self.conv = nn.Conv1d(
+            in_channels, out_channels, kernel_size,
+            stride=stride, padding=kernel_size)
+
+    def forward(self, x):
+        x = self.conv(x)
+        return x[:, :, :-self.kernel_size]
+
 
 class CPCModel(nn.Module):
 
@@ -37,11 +50,10 @@ class CPCModel(nn.Module):
                 * self.config.network.conv_base_depth)
             modules = [nn.BatchNorm1d(input_size)] if not k else []
             modules.extend([
-                nn.Conv1d(
+                CausalConv1d(
                     input_size,
                     depth,
                     kernel_size=3,
-                    padding=0,
                     stride=2
                 ),
                 nn.PReLU(depth)
@@ -71,6 +83,7 @@ class CPCModel(nn.Module):
     def forward(self, signal):
 
         signal = signal.permute(0, 2, 1)
+
         # z is (n, depth, steps)
         z = self.encoder(signal)
         # c is (n, context_size, steps)
