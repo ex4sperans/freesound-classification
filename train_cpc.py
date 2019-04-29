@@ -51,6 +51,10 @@ parser.add_argument(
     "in terms of processed batches"
 )
 parser.add_argument(
+    "--proj_interval", default=10, type=int,
+    help="how frequently to make projection in terms of epochs"
+)
+parser.add_argument(
     "--batch_size", type=int, default=64,
     help="minibatch size"
 )
@@ -171,6 +175,7 @@ with Experiment({
         "max_audio_length": args.max_audio_length
     },
     "train": {
+        "_proj_interval": args.proj_interval,
         "accumulation_steps": args.accumulation_steps,
         "batch_size": args.batch_size,
         "learning_rate": args.lr,

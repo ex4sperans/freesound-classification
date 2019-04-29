@@ -14,7 +14,7 @@ from torch.nn.functional import binary_cross_entropy_with_logits
 
 from ops.training import OPTIMIZERS, make_scheduler, make_step
 from networks.losses import binary_cross_entropy, focal_loss, lsep_loss
-from ops.utils import plot_umap
+from ops.utils import plot_projection
 
 
 
@@ -48,6 +48,8 @@ class CPCModel(nn.Module):
             ])
             encoder_layers.extend(modules)
 
+        encoder_layers.append(nn.BatchNorm1d(depth))
+
         self.encoder = nn.Sequential(*encoder_layers)
 
         self.context_network = nn.GRU(
@@ -57,8 +59,10 @@ class CPCModel(nn.Module):
         )
 
         self.coupling_transforms = torch.nn.ModuleList([
-            torch.nn.Conv1d(
-                self.config.network.context_size, depth, kernel_size=1)
+            torch.nn.Sequential(
+                torch.nn.Conv1d(
+                    self.config.network.context_size, depth, kernel_size=1)
+            )
             for steps in range(self.config.network.prediction_steps)
         ])
 
@@ -77,13 +81,13 @@ class CPCModel(nn.Module):
 
         for step, affine in enumerate(self.coupling_transforms, start=1):
 
-            shifted_c = c[:, :, :-step]
-            shifted_z = z[:, :, step:]
-            affine_output = affine(shifted_c)
+            a = affine(c)
 
             # logits is (n, steps, steps)
-            logits = (shifted_z.unsqueeze(2) * affine_output.unsqueeze(3)).sum(1)
-            labels = torch.eye(logits.size(2), device=z.device)
+            logits = torch.bmm(z.permute(0, 2, 1), a)
+
+            labels = torch.eye(logits.size(2) - step, device=z.device)
+            labels = torch.nn.functional.pad(labels, (0, step, step, 0))
             labels = labels.unsqueeze(0).expand_as(logits)
 
             loss = binary_cross_entropy_with_logits(logits, labels)
@@ -130,7 +134,7 @@ class CPCModel(nn.Module):
         )
         writer.add_image("c", image_grid, global_step)
 
-    def add_umap_summary(self, image, global_step, writer, name="umap"):
+    def add_projection_summary(self, image, global_step, writer, name="projection"):
         writer.add_image(name, image.transpose(2, 0, 1), global_step)
 
     def train_epoch(self, train_loader,
@@ -238,14 +242,16 @@ class CPCModel(nn.Module):
                 valid_losses,
                 writer=self.valid_writer, global_step=self.global_step
             )
-            self.add_umap_summary(
-                plot_umap(all_c, all_labels, frames_per_example=5),
-                writer=self.valid_writer, global_step=self.global_step,
-                name="umap_c")
-            self.add_umap_summary(
-                plot_umap(all_z, all_labels, frames_per_example=5),
-                writer=self.valid_writer, global_step=self.global_step,
-                name="umap_z")
+            if epoch % self.config.train._proj_interval == 0:
+                self.add_projection_summary(
+                    plot_projection(
+                        all_c, all_labels, frames_per_example=5, newline=True),
+                    writer=self.valid_writer, global_step=self.global_step,
+                    name="projection_c")
+                self.add_projection_summary(
+                    plot_projection(all_z, all_labels, frames_per_example=5),
+                    writer=self.valid_writer, global_step=self.global_step,
+                    name="projection_z")
 
         if verbose:
             print("\nValidation loss: {:.4f}".format(valid_loss))

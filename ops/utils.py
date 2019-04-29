@@ -2,7 +2,11 @@ import json
 
 import umap
 import numpy as np
-from sklearn.metrics import label_ranking_average_precision_score
+from sklearn.manifold import TSNE
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import label_ranking_average_precision_score, accuracy_score
 from matplotlib import pyplot as plt
 
 
@@ -30,7 +34,7 @@ def get_class_names_from_classmap(classmap):
     return [r[label] for label in sorted(classmap.values())]
 
 
-def plot_umap(vectors, labels, frames_per_example=3):
+def plot_projection(vectors, labels, frames_per_example=3, newline=False):
 
     representations = []
     classes = []
@@ -45,7 +49,23 @@ def plot_umap(vectors, labels, frames_per_example=3):
 
     representations = np.array(representations)
 
-    embeddings = umap.UMAP().fit_transform(representations)
+    # fit a simple model to estimate the quality of the learned representations
+    X_train, X_valid, y_train, y_valid = train_test_split(
+        representations, classes, shuffle=False, test_size=0.2)
+
+    scaler = StandardScaler().fit(X_train)
+    X_train = scaler.transform(X_train)
+    X_valid = scaler.transform(X_valid)
+    model = KNeighborsClassifier(n_neighbors=5)
+    model.fit(X_train, y_train)
+
+    score = accuracy_score(y_valid, model.predict(X_valid))
+    if newline:
+        print()
+    print("Classification accuracy: {:.4f}".format(score))
+
+    # plot projection
+    embeddings = TSNE().fit_transform(representations)
 
     fig = plt.figure(figsize=(10, 10))
     ax = fig.add_subplot(111)
