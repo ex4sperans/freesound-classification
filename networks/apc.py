@@ -211,7 +211,7 @@ class APCModel(nn.Module):
                     valid_losses[k] += loss.item() * multiplier
 
                 all_outputs.extend(
-                    outputs["output"].permute(0, 2, 1).data.cpu().numpy())
+                    outputs["output"].data.cpu().numpy())
                 all_labels.extend(labels.data.cpu().numpy())
 
         valid_loss = sum(valid_losses)
