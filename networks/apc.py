@@ -35,13 +35,12 @@ class APCModel(nn.Module):
             batch_first=True
         )
 
-        self.output_norm = nn.LayerNorm((
-            self.config.network.rnn_size * self.config.network.rnn_layers,))
+        self.output_norm = nn.LayerNorm((self.config.network.rnn_size,))
 
         self.prediction_transforms = torch.nn.ModuleList([
             torch.nn.Sequential(
                 torch.nn.Linear(
-                    self.config.network.rnn_size * self.config.network.rnn_layers,
+                    self.config.network.rnn_size,
                     self.config.data._input_dim)
             )
             for steps in range(self.config.network.prediction_steps)
