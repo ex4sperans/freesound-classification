@@ -574,19 +574,30 @@ class TwoDimensionalCNNClassificationModel(nn.Module):
 
                 make_step(self.scheduler, step=self.global_step)
 
-                signal, labels = (
+                signal, labels, is_noisy = (
                     sample["signal"].to(self.device),
-                    sample["labels"].to(self.device).float()
+                    sample["labels"].to(self.device).float(),
+                    sample["is_noisy"].to(self.device).float()
                 )
 
                 outputs = self(signal)
 
                 class_logits = outputs["class_logits"].squeeze()
 
+                is_noisy = is_noisy.unsqueeze(-1)
+                predicted_labels = torch.sigmoid(class_logits.detach())
+                m = self.pseudolabel_weight(self.global_step)
+                train_labels = (
+                    (1 - is_noisy) * labels +
+                    is_noisy * (
+                        m * predicted_labels + (1 - m) * labels
+                    )
+                )
+
                 loss = (
                     lsep_loss(
                         class_logits,
-                        labels,
+                        train_labels,
                         average=False
                     )
                 ) / self.config.train.accumulation_steps
@@ -736,6 +747,11 @@ class TwoDimensionalCNNClassificationModel(nn.Module):
 
         self.global_step = 0
         self.make_optimizer(max_steps=len(train_loader) * epochs)
+
+        def pseudolabel_weight(iteration):
+            return iteration / (len(train_loader) * epochs)
+
+        self.pseudolabel_weight = pseudolabel_weight
 
         scores = []
         best_score = 0

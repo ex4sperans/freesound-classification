@@ -195,7 +195,8 @@ with Experiment({
         "_holdout_size": args.holdout_size,
         "p_mixup": args.p_mixup,
         "p_aug": args.p_aug,
-        "max_audio_length": args.max_audio_length
+        "max_audio_length": args.max_audio_length,
+        "noisy": args.noisy_train_df is not None
     },
     "train": {
         "accumulation_steps": args.accumulation_steps,
@@ -269,6 +270,7 @@ with Experiment({
                 labels=[
                     item.split(",") for item in
                     train_df.labels.values[train]] + noisy_labels,
+                is_noisy=[0] * len(train) + [1] * len(noisy_labels),
                 transform=Compose([
                     LoadAudio(),
                     SampleLongAudio(max_length=args.max_audio_length),

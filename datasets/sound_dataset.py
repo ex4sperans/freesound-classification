@@ -14,16 +14,21 @@ import pandas as pd
 class SoundDataset(data.Dataset):
 
     def __init__(
-        self, audio_files, labels=None, transform=None, clean_transform=None):
+        self, audio_files, labels=None,
+        transform=None, is_noisy=None, clean_transform=None):
 
         self.transform = transform
         self.clean_transform = clean_transform
         self.audio_files = audio_files
         self.labels = labels
+        self.is_noisy = is_noisy or np.zeros(len(self.labels))
 
     def __getitem__(self, index):
 
-        sample = dict(filename=self.audio_files[index])
+        sample = dict(
+            filename=self.audio_files[index],
+            is_noisy=self.is_noisy[index]
+        )
 
         if self.labels is not None:
             sample["raw_labels"] = self.labels[index]
@@ -37,7 +42,10 @@ class SoundDataset(data.Dataset):
 
         index = random.randint(0, len(self) - 1)
 
-        sample = dict(filename=self.audio_files[index])
+        sample = dict(
+            filename=self.audio_files[index],
+            is_noisy=self.is_noisy[index]
+        )
 
         if self.labels is not None:
             sample["raw_labels"] = self.labels[index]
