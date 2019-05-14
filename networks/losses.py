@@ -25,7 +25,7 @@ def binary_cross_entropy(input, target, raw=True):
 def lsep_loss(input, target, raw=True):
 
     differences = input.unsqueeze(1) - input.unsqueeze(2)
-    where_different = (1 - target.unsqueeze(1)) * target.unsqueeze(2)
+    where_different = (target.unsqueeze(1) < target.unsqueeze(2)).float()
 
     exps = differences.exp() * where_different
     lsep = torch.log(1 + exps.sum(2).sum(1))
