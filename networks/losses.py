@@ -28,6 +28,7 @@ def lsep_loss(input, target, average=True):
     where_different = (target.unsqueeze(1) < target.unsqueeze(2)).float()
 
     exps = differences.exp() * where_different
+    exps = torch.clamp(exps, 0, 100)
     lsep = torch.log(1 + exps.sum(2).sum(1))
 
     if average:
