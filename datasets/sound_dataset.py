@@ -21,7 +21,7 @@ class SoundDataset(data.Dataset):
         self.clean_transform = clean_transform
         self.audio_files = audio_files
         self.labels = labels
-        self.is_noisy = is_noisy or np.zeros(len(self.labels))
+        self.is_noisy = is_noisy or np.zeros(len(self.audio_files))
 
     def __getitem__(self, index):
 
