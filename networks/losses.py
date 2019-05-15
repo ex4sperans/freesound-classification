@@ -24,12 +24,20 @@ def binary_cross_entropy(input, target, raw=True):
 
 def lsep_loss(input, target, average=True):
 
-    differences = input.unsqueeze(1) - input.unsqueeze(2)
-    where_different = (target.unsqueeze(1) < target.unsqueeze(2)).float()
+    n = input.size(0)
 
-    exps = differences.exp() * where_different
-    exps = torch.clamp(exps, 0, 100)
-    lsep = torch.log(1 + exps.sum(2).sum(1))
+    differences = input.unsqueeze(1) - input.unsqueeze(2)
+    where_lower = (target.unsqueeze(1) < target.unsqueeze(2)).float()
+
+    differences = differences.view(n, -1)
+    where_lower = where_lower.view(n, -1)
+
+    max_difference, index = torch.max(differences, dim=1, keepdim=True)
+    max_difference = torch.relu(max_difference)
+    differences = differences - max_difference
+    exps = differences.exp() * where_lower
+
+    lsep = max_difference + torch.log(torch.exp(-max_difference) + exps.sum(-1))
 
     if average:
         return lsep.mean()
