@@ -509,18 +509,13 @@ class TwoDimensionalCNNClassificationModel(nn.Module):
 
     def forward(self, signal):
 
-        print(signal.size(), signal.min(), signal.max())
         if is_mel(self.config.data.features):
             signal = nn.functional.conv1d(
                 signal.permute(0, 2, 1),
                 self.filterbanks.unsqueeze(-1)
             )
-            print(signal.size(), signal.min(), signal.max())
             signal = torch.log(signal + 1e-4)
             signal = signal.permute(0, 2, 1)
-
-        print(signal.size(), signal.min(), signal.max())
-        print(self.filterbanks.size(), self.filterbanks.min(), self.filterbanks.max())
 
         signal = signal.unsqueeze(1)
         signal = signal.permute(0, 1, 3, 2)
