@@ -33,7 +33,6 @@ def lsep_loss(input, target, average=True):
     where_lower = where_lower.view(n, -1)
 
     max_difference, index = torch.max(differences, dim=1, keepdim=True)
-    max_difference = torch.relu(max_difference)
     differences = differences - max_difference
     exps = differences.exp() * where_lower
 
