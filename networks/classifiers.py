@@ -15,7 +15,7 @@ from pretrainedmodels import resnet34
 
 from ops.training import OPTIMIZERS, make_scheduler, make_step
 from networks.losses import binary_cross_entropy, focal_loss, lsep_loss
-from ops.utils import lwlrap
+from ops.utils import lwlrap, make_mel_filterbanks, is_mel
 
 
 class ConvLockedDropout(nn.Module):
@@ -451,6 +451,12 @@ class TwoDimensionalCNNClassificationModel(nn.Module):
         self.experiment = experiment
         self.config = experiment.config
 
+        if is_mel(self.config.data.features):
+            self.register_buffer(
+                "filterbanks",
+                torch.from_numpy(make_mel_filterbanks(self.config.data.features))
+            )
+
         self.conv_modules = torch.nn.ModuleList()
 
         total_depth = 0
@@ -502,6 +508,19 @@ class TwoDimensionalCNNClassificationModel(nn.Module):
         return x
 
     def forward(self, signal):
+
+        print(signal.size(), signal.min(), signal.max())
+        if is_mel(self.config.data.features):
+            signal = nn.functional.conv1d(
+                signal.permute(0, 2, 1),
+                self.filterbanks.unsqueeze(-1)
+            )
+            print(signal.size(), signal.min(), signal.max())
+            signal = torch.log(signal + 1e-4)
+            signal = signal.permute(0, 2, 1)
+
+        print(signal.size(), signal.min(), signal.max())
+        print(self.filterbanks.size(), self.filterbanks.min(), self.filterbanks.max())
 
         signal = signal.unsqueeze(1)
         signal = signal.permute(0, 1, 3, 2)

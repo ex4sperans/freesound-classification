@@ -179,12 +179,7 @@ class AudioFeatures:
             self.n_mel = int(n_mel)
 
             self.n_features = self.n_mel
-            self.padding_value = math.log(self.eps)
-
-            self.filterbank = librosa.filters.mel(
-                sr=SAMPLE_RATE, n_fft=self.n_fft, n_mels=self.n_mel,
-                fmin=5, fmax=None
-            ).astype(np.float32)
+            self.padding_value = 0.0
 
             if verbose:
                 print(
@@ -227,10 +222,7 @@ class AudioFeatures:
                 eps=self.eps, log=False
             )
 
-            mel = self.filterbank.dot(stft)
-            mel = np.log(mel + self.eps)
-
-            transformed["signal"] = np.transpose(mel)
+            transformed["signal"] = np.transpose(stft)
 
         elif self.feature_type == "raw":
             transformed["signal"] = np.expand_dims(inputs["audio"], -1)

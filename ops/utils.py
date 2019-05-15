@@ -8,6 +8,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import label_ranking_average_precision_score, accuracy_score
 from matplotlib import pyplot as plt
+import librosa
 
 
 # Calculate the overall lwlrap using sklearn.metrics function.
@@ -78,3 +79,24 @@ def plot_projection(vectors, labels, frames_per_example=3, newline=False):
     plt.close()
 
     return image
+
+
+def make_mel_filterbanks(descriptor, sr=44100):
+
+    name, *args = descriptor.split("_")
+
+    n_fft, hop_size, n_mel = args
+    n_fft = int(n_fft)
+    hop_size = int(hop_size)
+    n_mel = int(n_mel)
+
+    filterbank = librosa.filters.mel(
+        sr=sr, n_fft=n_fft, n_mels=n_mel,
+        fmin=5, fmax=None
+    ).astype(np.float32)
+
+    return filterbank
+
+
+def is_mel(descriptor):
+    return descriptor.startswith("mel")
