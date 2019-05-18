@@ -452,10 +452,8 @@ class TwoDimensionalCNNClassificationModel(nn.Module):
         self.config = experiment.config
 
         if is_mel(self.config.data.features):
-            self.register_buffer(
-                "filterbanks",
-                torch.from_numpy(make_mel_filterbanks(self.config.data.features))
-            )
+            self.filterbanks = torch.from_numpy(
+                make_mel_filterbanks(self.config.data.features)).to(self.device)
 
         self.conv_modules = torch.nn.ModuleList()
 
