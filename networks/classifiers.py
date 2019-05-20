@@ -596,20 +596,10 @@ class TwoDimensionalCNNClassificationModel(nn.Module):
 
                 class_logits = outputs["class_logits"].squeeze()
 
-                is_noisy = is_noisy.unsqueeze(-1)
-                predicted_labels = torch.sigmoid(class_logits.detach())
-                m = self.pseudolabel_weight(self.global_step)
-                train_labels = (
-                    (1 - is_noisy) * labels +
-                    is_noisy * (
-                        m * predicted_labels + (1 - m) * labels
-                    )
-                )
-
                 loss = (
                     lsep_loss(
                         class_logits,
-                        train_labels,
+                        labels,
                         average=False
                     )
                 ) / self.config.train.accumulation_steps
