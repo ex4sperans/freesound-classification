@@ -10,7 +10,7 @@ import torch
 
 from ops.audio import (
     read_audio, compute_stft, trim_audio, mix_audio_and_labels,
-    shuffle_audio
+    shuffle_audio, cutout
 )
 
 
@@ -267,6 +267,24 @@ class ShuffleAudio(Augmentation):
         if np.random.uniform() < self.p:
             transformed["audio"] = shuffle_audio(
                 transformed["audio"], self.chunks_range)
+
+        return transformed
+
+
+class CutOut(Augmentation):
+
+    def __init__(self, area=0.25, p=0.5):
+
+        self.area = area
+        self.p = p
+
+    def __call__(self, dataset, **inputs):
+
+        transformed = dict(inputs)
+
+        if np.random.uniform() < self.p:
+            transformed["audio"] = cutout(
+                transformed["audio"], self.area)
 
         return transformed
 

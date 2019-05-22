@@ -61,3 +61,15 @@ def shuffle_audio(audio, chunks_range=(2, 4)):
     shuffled = np.concatenate([audio[s] for s in slices])
 
     return shuffled
+
+
+def cutout(audio, area=0.25):
+
+    area = int(audio.size * area)
+
+    start = random.randrange(audio.size)
+    end = start + area
+
+    audio[start:end] = 0
+
+    return audio
