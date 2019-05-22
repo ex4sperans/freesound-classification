@@ -14,7 +14,7 @@ from sklearn.model_selection import train_test_split
 
 from datasets.sound_dataset import SoundDataset
 from networks.classifiers import TwoDimensionalCNNClassificationModel
-from ops.folds import train_validation_data
+from ops.folds import train_validation_data, train_validation_data_stratified
 from ops.transforms import (
     Compose, DropFields, LoadAudio,
     AudioFeatures, MapLabels, RenameFields,
@@ -235,8 +235,8 @@ with Experiment({
         holdout_df = train_df.iloc[holdout].reset_index(drop=True)
         train_df = train_df.iloc[keep].reset_index(drop=True)
 
-    splits = list(train_validation_data(
-        train_df.fname, train_df.labels,
+    splits = list(train_validation_data_stratified(
+        train_df.fname, train_df.labels, class_map,
         config.data._n_folds, config.data._kfold_seed))
 
     for fold in args.folds:
