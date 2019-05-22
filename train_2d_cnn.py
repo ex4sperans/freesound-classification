@@ -19,7 +19,7 @@ from ops.transforms import (
     Compose, DropFields, LoadAudio,
     AudioFeatures, MapLabels, RenameFields,
     MixUp, SampleSegment, SampleLongAudio,
-    AudioAugmentation)
+    AudioAugmentation, ShuffleAudio)
 from ops.utils import load_json, get_class_names_from_classmap, lwlrap
 from ops.padding import make_collate_fn
 
@@ -275,6 +275,7 @@ with Experiment({
                     LoadAudio(),
                     SampleLongAudio(max_length=args.max_audio_length),
                     MapLabels(class_map=class_map),
+                    ShuffleAudio(chunks_range=(3, 5)),
                     MixUp(p=args.p_mixup),
                     AudioAugmentation(p=args.p_aug),
                     audio_transform,

@@ -8,7 +8,10 @@ import librosa
 import numpy as np
 import torch
 
-from ops.audio import read_audio, compute_stft, trim_audio, mix_audio_and_labels
+from ops.audio import (
+    read_audio, compute_stft, trim_audio, mix_audio_and_labels,
+    shuffle_audio
+)
 
 
 SAMPLE_RATE = 44100
@@ -235,7 +238,7 @@ class SampleSegment(Augmentation):
     def __init__(self, ratio=(0.3, 0.9), p=1.0):
 
         self.min, self.max = ratio
-        self.p = 1.0
+        self.p = p
 
     def __call__(self, dataset, **inputs):
 
@@ -246,6 +249,24 @@ class SampleSegment(Augmentation):
             target_size = int(np.random.uniform(self.min, self.max) * original_size)
             start = np.random.randint(original_size - target_size - 1)
             transformed["audio"] = inputs["audio"][start:start+target_size]
+
+        return transformed
+
+
+class ShuffleAudio(Augmentation):
+
+    def __init__(self, chunks_range=(2, 4), p=0.5):
+
+        self.chunks_range = chunks_range
+        self.p = p
+
+    def __call__(self, dataset, **inputs):
+
+        transformed = dict(inputs)
+
+        if np.random.uniform() < self.p:
+            transformed["audio"] = shuffle_audio(
+                transformed["audio"], self.chunks_range)
 
         return transformed
 

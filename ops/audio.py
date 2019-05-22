@@ -4,6 +4,8 @@ import numpy as np
 import librosa
 import scipy.signal
 
+from sklearn.utils import gen_even_slices
+
 
 def compute_stft(audio, window_size, hop_size, log=True, eps=1e-4):
     f, t, s = scipy.signal.stft(
@@ -48,3 +50,14 @@ def mix_audio_and_labels(first_audio, second_audio, first_labels, second_labels)
     longer[start:end] =+ shorter * (1 - a)
 
     return longer, new_labels
+
+
+def shuffle_audio(audio, chunks_range=(2, 4)):
+
+    n_chunks = random.randrange(*chunks_range)
+    slices = list(gen_even_slices(audio.size, n_chunks))
+    random.shuffle(slices)
+
+    shuffled = np.concatenate([audio[s] for s in slices])
+
+    return shuffled
