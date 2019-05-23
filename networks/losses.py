@@ -22,7 +22,7 @@ def binary_cross_entropy(input, target, raw=True):
     return torch.nn.functional.binary_cross_entropy(input, target)
 
 
-def lsep_loss(input, target, average=True):
+def lsep_loss_stable(input, target, average=True):
 
     n = input.size(0)
 
@@ -37,6 +37,20 @@ def lsep_loss(input, target, average=True):
     exps = differences.exp() * where_lower
 
     lsep = max_difference + torch.log(torch.exp(-max_difference) + exps.sum(-1))
+
+    if average:
+        return lsep.mean()
+    else:
+        return lsep
+
+
+def lsep_loss(input, target, average=True):
+
+    differences = input.unsqueeze(1) - input.unsqueeze(2)
+    where_different = (target.unsqueeze(1) < target.unsqueeze(2)).float()
+
+    exps = differences.exp() * where_different
+    lsep = torch.log(1 + exps.sum(2).sum(1))
 
     if average:
         return lsep.mean()
