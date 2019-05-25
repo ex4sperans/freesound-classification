@@ -228,7 +228,7 @@ class OneCycleScheduler:
             lr = self.annealing(self.min_lr, self.max_lr, r)
         else:
             r = (self.epoch - mid) / (self.max_steps - mid)
-            lr = self.annealing(self.max_lr, self.min_lr / 10, r)
+            lr = self.annealing(self.max_lr, self.min_lr / 1e3, r)
 
         for param_group in self.optimizer.param_groups:
             param_group['lr'] = lr
