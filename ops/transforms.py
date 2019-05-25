@@ -164,7 +164,7 @@ class AudioFeatures:
             self.hop_size = int(hop_size)
 
             self.n_features = self.n_fft // 2 + 1
-            self.padding_value = math.log(self.eps)
+            self.padding_value = 0.0
 
             if verbose:
                 print(
@@ -209,13 +209,13 @@ class AudioFeatures:
 
         if self.feature_type == "stft":
 
-            stft = compute_stft(
-                inputs["audio"],
-                window_size=self.n_fft, hop_size=self.hop_size,
-                eps=self.eps, log=True
-            )
+            # stft = compute_stft(
+            #     inputs["audio"],
+            #     window_size=self.n_fft, hop_size=self.hop_size,
+            #     eps=self.eps, log=True
+            # )
 
-            transformed["signal"] = np.transpose(stft)
+            transformed["signal"] = np.expand_dims(inputs["audio"], -1)
 
         elif self.feature_type == "mel":
 
@@ -225,7 +225,7 @@ class AudioFeatures:
                 eps=self.eps, log=False
             )
 
-            transformed["signal"] = np.transpose(stft)
+            transformed["signal"] = np.expand_dims(inputs["audio"], -1)
 
         elif self.feature_type == "raw":
             transformed["signal"] = np.expand_dims(inputs["audio"], -1)

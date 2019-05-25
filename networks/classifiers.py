@@ -15,7 +15,7 @@ from pretrainedmodels import resnet34
 
 from ops.training import OPTIMIZERS, make_scheduler, make_step
 from networks.losses import binary_cross_entropy, focal_loss, lsep_loss
-from ops.utils import lwlrap, make_mel_filterbanks, is_mel
+from ops.utils import lwlrap, make_mel_filterbanks, is_mel, is_stft, compute_torch_stft
 
 
 class ConvLockedDropout(nn.Module):
@@ -507,16 +507,23 @@ class TwoDimensionalCNNClassificationModel(nn.Module):
 
     def forward(self, signal):
 
+        if is_stft(self.config.data.features) or is_mel(self.config.data.features):
+            signal = compute_torch_stft(
+                signal.squeeze(-1),
+                self.config.data.features
+            )
+
+            if is_stft(self.config.data.features):
+                signal = torch.log(signal + 1e-4)
+
         if is_mel(self.config.data.features):
             signal = nn.functional.conv1d(
-                signal.permute(0, 2, 1),
+                signal,
                 self.filterbanks.unsqueeze(-1)
             )
             signal = torch.log(signal + 1e-4)
-            signal = signal.permute(0, 2, 1)
 
         signal = signal.unsqueeze(1)
-        signal = signal.permute(0, 1, 3, 2)
         signal = self._add_frequency_encoding(signal)
 
         features = []
@@ -756,11 +763,6 @@ class TwoDimensionalCNNClassificationModel(nn.Module):
 
         self.global_step = 0
         self.make_optimizer(max_steps=len(train_loader) * epochs)
-
-        def pseudolabel_weight(iteration):
-            return iteration / (len(train_loader) * epochs)
-
-        self.pseudolabel_weight = pseudolabel_weight
 
         scores = []
         best_score = 0

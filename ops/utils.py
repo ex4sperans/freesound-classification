@@ -1,5 +1,6 @@
 import json
 
+import torch
 import umap
 import numpy as np
 from sklearn.manifold import TSNE
@@ -100,3 +101,28 @@ def make_mel_filterbanks(descriptor, sr=44100):
 
 def is_mel(descriptor):
     return descriptor.startswith("mel")
+
+
+def is_stft(descriptor):
+    return descriptor.startswith("stft")
+
+
+def compute_torch_stft(audio, descriptor):
+
+    name, *args = descriptor.split("_")
+
+    n_fft, hop_size, *rest = args
+    n_fft = int(n_fft)
+    hop_size = int(hop_size)
+
+    stft = torch.stft(
+        audio,
+        n_fft=n_fft,
+        hop_length=hop_size,
+        window=torch.hann_window(n_fft, device=audio.device)
+    )
+
+    stft = torch.sqrt((stft ** 2).sum(-1))
+
+    return stft
+

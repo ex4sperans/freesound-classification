@@ -52,7 +52,7 @@ def mix_audio_and_labels(first_audio, second_audio, first_labels, second_labels)
     return longer, new_labels
 
 
-def shuffle_audio(audio, chunk_length=0.5):
+def shuffle_audio(audio, chunk_length=0.5, sr=None):
 
     n_chunks = int((audio.size / sr) / chunk_length)
 
