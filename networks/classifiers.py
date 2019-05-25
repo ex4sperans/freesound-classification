@@ -133,8 +133,7 @@ class HierarchicalCNNClassificationModel(nn.Module):
                 nn.Conv1d(
                     input_size,
                     depth,
-                    kernel_size=3,
-                    padding=0
+                    kernel_size=3
                 ),
                 nn.MaxPool1d(kernel_size=2, stride=2),
                 nn.BatchNorm1d(depth),
@@ -475,7 +474,7 @@ class TwoDimensionalCNNClassificationModel(nn.Module):
                     input_size,
                     depth,
                     kernel_size=3,
-                    padding=0
+                    padding=1
                 ),
                 nn.MaxPool2d(kernel_size=2, stride=2),
                 nn.BatchNorm2d(depth),
