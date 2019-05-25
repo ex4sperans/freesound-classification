@@ -52,9 +52,13 @@ def mix_audio_and_labels(first_audio, second_audio, first_labels, second_labels)
     return longer, new_labels
 
 
-def shuffle_audio(audio, chunks_range=(2, 4)):
+def shuffle_audio(audio, chunk_length=0.5):
 
-    n_chunks = random.randrange(*chunks_range)
+    n_chunks = int((audio.size / sr) / chunk_length)
+
+    if n_chunks in (0, 1):
+        return audio
+
     slices = list(gen_even_slices(audio.size, n_chunks))
     random.shuffle(slices)
 

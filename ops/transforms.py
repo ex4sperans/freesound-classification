@@ -255,9 +255,9 @@ class SampleSegment(Augmentation):
 
 class ShuffleAudio(Augmentation):
 
-    def __init__(self, chunks_range=(2, 4), p=0.5):
+    def __init__(self, chunk_length=0.5, p=0.5):
 
-        self.chunks_range = chunks_range
+        self.chunk_length = chunk_length
         self.p = p
 
     def __call__(self, dataset, **inputs):
@@ -266,7 +266,7 @@ class ShuffleAudio(Augmentation):
 
         if np.random.uniform() < self.p:
             transformed["audio"] = shuffle_audio(
-                transformed["audio"], self.chunks_range)
+                transformed["audio"], self.chunk_length, sr=transformed["sr"])
 
         return transformed
 
