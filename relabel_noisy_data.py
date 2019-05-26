@@ -73,6 +73,15 @@ def nonzero(x):
     return np.nonzero(x)[0]
 
 
+def merge_labels(first, second):
+
+    merged = []
+    for f, s in zip(first, second):
+        merged.append(",".join(set(f.split(",") | set(s.split(",")))))
+
+    return merged
+
+
 if mode == "fullmatch":
 
     expected_classes_per_sample, = params
@@ -86,7 +95,7 @@ if mode == "fullmatch":
 
     relabeled = noisy_df[match]
 
-if mode == "relabelall":
+elif mode == "relabelall":
 
     expected_classes_per_sample, = params
     expected_classes_per_sample = float(expected_classes_per_sample)
@@ -98,6 +107,36 @@ if mode == "relabelall":
     new_labels = binary_to_labels(binary)
 
     noisy_df.labels = new_labels
+    noisy_df = noisy_df[noisy_df.labels != ""]
+
+    relabeled = noisy_df
+
+elif mode == "relabelall-replacenan":
+
+    expected_classes_per_sample, = params
+    expected_classes_per_sample = float(expected_classes_per_sample)
+
+    probs = noisy_predictions_df[class_cols].values
+    threshold = find_threshold(probs, expected_classes_per_sample)
+    binary = probs > threshold
+
+    new_labels = pd.Series(binary_to_labels(binary))
+    where_non_empty = (new_labels != "")
+    noisy_df.labels[where_non_empty] = new_labels[where_non_empty]
+
+    relabeled = noisy_df
+
+elif mode == "relabelall-merge":
+
+    expected_classes_per_sample, = params
+    expected_classes_per_sample = float(expected_classes_per_sample)
+
+    probs = noisy_predictions_df[class_cols].values
+    threshold = find_threshold(probs, expected_classes_per_sample)
+    binary = probs > threshold
+
+    new_labels = binary_to_labels(binary)
+    noisy_df.labels = merge_labels(noisy_df.labels.values, new_labels)
 
     relabeled = noisy_df
 
