@@ -78,7 +78,8 @@ def merge_labels(first, second):
     merged = []
     for f, s in zip(first, second):
         m = set(f.split(",")) | set(s.split(","))
-        m.remove("")
+        if "" in m:
+            m.remove("")
         merged.append(m)
 
     return merged
