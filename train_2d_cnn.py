@@ -239,6 +239,11 @@ with Experiment({
         train_df.fname, train_df.labels, class_map,
         config.data._n_folds, config.data._kfold_seed))
 
+    if args.noisy_train_df:
+        noisy_splits = list(train_validation_data(
+            noisy_train_df.fname, noisy_train_df.labels,
+            config.data._n_folds, config.data._kfold_seed))
+
     for fold in args.folds:
 
         print("\n\n   -----  Fold {}\n".format(fold))
@@ -253,11 +258,15 @@ with Experiment({
         experiment.register_directory("predictions")
 
         if args.noisy_train_df:
+
+            noisy_train, noisy_valid = noisy_splits[fold]
+
             noisy_audio_files = [
                 os.path.join(args.noisy_train_data_dir, fname)
-                for fname in noisy_train_df.fname.values]
+                for fname in noisy_train_df.fname.values[noisy_valid]]
             noisy_labels = [
-                item.split(",") for item in noisy_train_df.labels.values]
+                item.split(",") for item in
+                noisy_train_df.labels.values[noisy_valid]]
         else:
             noisy_audio_files = []
             noisy_labels = []
