@@ -196,7 +196,11 @@ with Experiment({
         "p_mixup": args.p_mixup,
         "p_aug": args.p_aug,
         "max_audio_length": args.max_audio_length,
-        "noisy": args.noisy_train_df is not None
+        "noisy": args.noisy_train_df is not None,
+        "_train_df": args.train_df,
+        "_train_data_dir": args.train_data_dir,
+        "_noisy_train_df": args.noisy_train_df,
+        "_noisy_train_data_dir": args.noisy_train_data_dir
     },
     "train": {
         "accumulation_steps": args.accumulation_steps,
