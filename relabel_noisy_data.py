@@ -77,7 +77,7 @@ def merge_labels(first, second):
 
     merged = []
     for f, s in zip(first, second):
-        merged.append(",".join(set(f.split(",") | set(s.split(",")))))
+        merged.append(",".join(set(f.split(",")) | set(s.split(","))))
 
     return merged
 
