@@ -80,7 +80,7 @@ def merge_labels(first, second):
         m = set(f.split(",")) | set(s.split(","))
         if "" in m:
             m.remove("")
-        merged.append(m)
+        merged.append(",".join(m))
 
     return merged
 
