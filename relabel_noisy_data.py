@@ -41,14 +41,22 @@ mode, *params = args.mode.split("_")
 
 class_cols = noisy_predictions_df.columns.drop("fname").values
 classname_to_idx = dict((c, i) for i, c in enumerate(class_cols))
+idx_to_classname = dict(enumerate(class_cols))
 noisy_labels = np.zeros((len(noisy_df), len(class_cols)), dtype=np.float32)
 for k in range(noisy_df.labels.values.size):
     for label in str(noisy_df.labels.values[k]).split(","):
         noisy_labels[k, classname_to_idx[label]] = 1
 
-if mode == "fullmatch":
 
-    def find_threshold(probs, expected_classes_per_sample):
+def binary_to_labels(binary):
+    labels = []
+    for row in binary:
+        labels.append(",".join(idx_to_classname[k] for k in nonzero(row)))
+
+    return labels
+
+
+def find_threshold(probs, expected_classes_per_sample):
 
         thresholds = np.linspace(0, 1, 10000)
         classes_per_sample = np.zeros_like(thresholds)
@@ -61,20 +69,38 @@ if mode == "fullmatch":
 
         return thresholds[k]
 
-    def nonzero(x):
-        return np.nonzero(x)[0]
+def nonzero(x):
+    return np.nonzero(x)[0]
+
+
+if mode == "fullmatch":
 
     expected_classes_per_sample, = params
     expected_classes_per_sample = float(expected_classes_per_sample)
 
     probs = noisy_predictions_df[class_cols].values
     threshold = find_threshold(probs, expected_classes_per_sample)
-    print(threshold)
     binary = probs > threshold
 
     match = (binary == noisy_labels).all(-1)
 
     relabeled = noisy_df[match]
+
+if mode == "relabelall":
+
+    expected_classes_per_sample, = params
+    expected_classes_per_sample = float(expected_classes_per_sample)
+
+    probs = noisy_predictions_df[class_cols].values
+    threshold = find_threshold(probs, expected_classes_per_sample)
+    binary = probs > threshold
+
+    new_labels = binary_to_labels(binary)
+
+    noisy_df.labels = new_labels
+
+    relabeled = noisy_df
+
 
 print("Relabeled df shape:", relabeled.shape)
 
