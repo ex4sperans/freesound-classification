@@ -50,6 +50,10 @@ parser.add_argument(
     help="path to noisy train data (optional)"
 )
 parser.add_argument(
+    "--share_noisy", action="store_true", default=False,
+    help="whether to share noisy files across folds"
+)
+parser.add_argument(
     "--test_data_dir", required=True, type=str,
     help="path to test data"
 )
@@ -206,7 +210,8 @@ with Experiment({
         "_train_df": args.train_df,
         "_train_data_dir": args.train_data_dir,
         "_noisy_train_df": args.noisy_train_df,
-        "_noisy_train_data_dir": args.noisy_train_data_dir
+        "_noisy_train_data_dir": args.noisy_train_data_dir,
+        "_share_noisy": args.share_noisy
     },
     "train": {
         "accumulation_steps": args.accumulation_steps,
@@ -271,12 +276,20 @@ with Experiment({
 
             noisy_train, noisy_valid = noisy_splits[fold]
 
-            noisy_audio_files = [
-                os.path.join(args.noisy_train_data_dir, fname)
-                for fname in noisy_train_df.fname.values[noisy_valid]]
-            noisy_labels = [
-                item.split(",") for item in
-                noisy_train_df.labels.values[noisy_valid]]
+            if config.data._share_noisy:
+                noisy_audio_files = [
+                    os.path.join(args.noisy_train_data_dir, fname)
+                    for fname in noisy_train_df.fname.values]
+                noisy_labels = [
+                    item.split(",") for item in
+                    noisy_train_df.labels.values]
+            else:
+                noisy_audio_files = [
+                    os.path.join(args.noisy_train_data_dir, fname)
+                    for fname in noisy_train_df.fname.values[noisy_valid]]
+                noisy_labels = [
+                    item.split(",") for item in
+                    noisy_train_df.labels.values[noisy_valid]]
         else:
             noisy_audio_files = []
             noisy_labels = []
