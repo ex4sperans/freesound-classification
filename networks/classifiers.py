@@ -499,9 +499,12 @@ class TwoDimensionalCNNClassificationModel(nn.Module):
 
         self.global_maxpool = nn.AdaptiveMaxPool2d(1)
 
-        self.output_transform = nn.Sequential(
+       self.output_transform = nn.Sequential(
             nn.BatchNorm1d(total_depth),
+            nn.Linear(total_depth, total_depth),
             nn.Dropout(p=self.config.network.output_dropout),
+            nn.BatchNorm1d(total_depth),
+            nn.PReLU(total_depth),
             nn.Linear(total_depth, self.config.data._n_classes)
         )
 
