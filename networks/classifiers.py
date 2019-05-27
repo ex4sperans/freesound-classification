@@ -455,6 +455,7 @@ class TwoDimensionalCNNClassificationModel(nn.Module):
                 make_mel_filterbanks(self.config.data.features)).to(self.device)
 
         self.conv_modules = torch.nn.ModuleList()
+        self.rnns = torch.nn.ModuleList()
 
         total_depth = 0
 
@@ -465,8 +466,20 @@ class TwoDimensionalCNNClassificationModel(nn.Module):
                 self.config.network.growth_rate ** k
                 * self.config.network.conv_base_depth)
 
+            rnn_size = 128
+
             if k >= self.config.network.start_deep_supervision_on:
-                total_depth += depth
+                if self.config.network.aggregation_type == "max":
+                    total_depth += depth
+                elif self.config.network.aggregation_type == "rnn":
+                    total_depth += rnn_size * 2
+                    self.rnns.append(
+                        nn.Sequential(
+                            nn.LayerNorm((depth,)),
+                            nn.GRU(
+                                depth, rnn_size, batch_first=True, bidirectional=True)
+                        )
+                    )
 
             modules = [nn.BatchNorm2d(input_size)]
             modules.extend([
@@ -531,7 +544,14 @@ class TwoDimensionalCNNClassificationModel(nn.Module):
         for k, module in enumerate(self.conv_modules):
             h = module(h)
             if k >= self.config.network.start_deep_supervision_on:
-                features.append(self.global_maxpool(h).squeeze(-1).squeeze(-1))
+                if self.config.network.aggregation_type == "max":
+                    features.append(self.global_maxpool(h).squeeze(-1).squeeze(-1))
+                elif self.config.network.aggregation_type == "rnn":
+                    rnn_input = torch.mean(h, 2).permute(0, 2, 1)
+                    outputs, state = self.rnns[
+                        k - self.config.network.start_deep_supervision_on](rnn_input)
+                    features.append(
+                        state.permute(1, 0, 2).contiguous().view(rnn_input.size(0), -1))
 
         features = torch.cat(features, -1)
 

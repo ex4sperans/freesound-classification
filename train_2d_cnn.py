@@ -108,6 +108,11 @@ parser.add_argument(
     choices=("cuda", "cpu")
 )
 parser.add_argument(
+    "--aggregation_type", type=str, required=True,
+    help="how to aggregate outputs",
+    choices=("max", "rnn")
+)
+parser.add_argument(
     "--num_conv_blocks", type=int, default=5,
     help="number of conv blocks"
 )
@@ -185,6 +190,7 @@ with Experiment({
         "conv_base_depth": args.conv_base_depth,
         "growth_rate": args.growth_rate,
         "output_dropout": args.output_dropout,
+        "aggregation_type": args.aggregation_type
     },
     "data": {
         "features": args.features,
