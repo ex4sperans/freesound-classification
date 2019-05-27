@@ -95,15 +95,13 @@ class AudioAugmentation(Augmentation):
             effects_chain = (
                 pysndfx.AudioEffectsChain()
                 .reverb(
-                    reverberance=random.randrange(1, 70),
-                    room_scale=random.randrange(1, 70),
-                    stereo_depth=random.randrange(1, 70),
-                    wet_gain=random.randrange(-5, 5)
+                    reverberance=random.randrange(50),
+                    room_scale=random.randrange(50),
+                    stereo_depth=random.randrange(50)
                 )
-                .pitch(shift=random.randrange(-200, 200))
-                .overdrive(gain=random.randrange(1, 10))
-                .tempo(random.uniform(0.9, 1.1))
-                .sinc(random.uniform(10, 30), random.uniform(1500, 5000))
+                .pitch(shift=random.randrange(-300, 300))
+                .overdrive(gain=random.randrange(2, 10))
+                .speed(random.uniform(0.9, 1.1))
             )
             transformed["audio"] = effects_chain(inputs["audio"])
 
