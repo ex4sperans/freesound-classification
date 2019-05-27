@@ -369,3 +369,10 @@ class Compose:
             inputs = t(dataset=dataset, **inputs)
 
         return inputs
+
+
+class Identity:
+
+    def __call__(self, dataset=None, **inputs):
+
+        return inputs

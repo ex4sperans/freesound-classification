@@ -19,7 +19,7 @@ from ops.transforms import (
     Compose, DropFields, LoadAudio,
     AudioFeatures, MapLabels, RenameFields,
     MixUp, SampleSegment, SampleLongAudio,
-    AudioAugmentation, ShuffleAudio, CutOut)
+    AudioAugmentation, ShuffleAudio, CutOut, Identity)
 from ops.utils import load_json, get_class_names_from_classmap, lwlrap
 from ops.padding import make_collate_fn
 
@@ -307,7 +307,10 @@ with Experiment({
                     LoadAudio(),
                     SampleLongAudio(max_length=args.max_audio_length),
                     MapLabels(class_map=class_map),
-                    ShuffleAudio(chunk_length=0.5, p=0.5),
+                    (
+                        ShuffleAudio(chunk_length=0.5, p=0.5)
+                        if config.network.aggregation_type != "rnn" else Identity()
+                    ),
                     MixUp(p=args.p_mixup),
                     AudioAugmentation(p=args.p_aug),
                     audio_transform,
