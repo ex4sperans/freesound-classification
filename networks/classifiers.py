@@ -623,7 +623,7 @@ class TwoDimensionalCNNClassificationModel(nn.Module):
 
                 outputs = self(signal)
 
-                class_logits = outputs["class_logits"].squeeze()
+                class_logits = outputs["class_logits"]
 
                 loss = (
                     lsep_loss(
@@ -685,7 +685,7 @@ class TwoDimensionalCNNClassificationModel(nn.Module):
 
                 outputs = self(signal)
 
-                class_logits = outputs["class_logits"].squeeze()
+                class_logits = outputs["class_logits"]
 
                 loss = (
                     lsep_loss(
