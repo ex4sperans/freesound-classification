@@ -744,7 +744,7 @@ class TwoDimensionalCNNClassificationModel(nn.Module):
 
                     outputs = self(signal)
 
-                    class_logits = outputs["class_logits"].squeeze()
+                    class_logits = outputs["class_logits"]
 
                     class_probs = torch.sigmoid(class_logits).data.cpu().numpy()
                     tta_probs.extend(class_probs)
