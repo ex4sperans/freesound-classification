@@ -54,6 +54,10 @@ parser.add_argument(
     help="whether to share noisy files across folds"
 )
 parser.add_argument(
+    "--resume", action="store_true", default=False,
+    help="allow resuming even if experiment exists"
+)
+parser.add_argument(
     "--test_data_dir", required=True, type=str,
     help="path to test data"
 )
@@ -225,7 +229,7 @@ with Experiment({
         "switch_off_augmentations_on": args.switch_off_augmentations_on
     },
     "label": args.label
-}) as experiment:
+}, implicit_resuming=args.resume) as experiment:
 
     config = experiment.config
     print()
