@@ -5,6 +5,9 @@ import json
 import math
 from functools import partial
 
+from scipy.sparse import csr_matrix
+from scipy.stats import rankdata
+
 import pandas as pd
 import numpy as np
 
@@ -85,6 +88,32 @@ def merge_labels(first, second):
     return merged
 
 
+def score_samples(y_true, y_score):
+    scores = []
+
+    y_true = csr_matrix(y_true)
+    y_score = -y_score
+
+    n_samples, n_labels = y_true.shape
+
+    for i, (start, stop) in enumerate(zip(y_true.indptr, y_true.indptr[1:])):
+        relevant = y_true.indices[start:stop]
+
+        if (relevant.size == 0 or relevant.size == n_labels):
+            # If all labels are relevant or unrelevant, the score is also
+            # equal to 1. The label ranking has no meaning.
+            aux = 1.
+        else:
+            scores_i = y_score[i]
+            rank = rankdata(scores_i, 'max')[relevant]
+            L = rankdata(scores_i[relevant], 'max')
+            aux = (L / rank).mean()
+
+        scores.append(aux)
+
+    return np.array(scores)
+
+
 if mode == "fullmatch":
 
     expected_classes_per_sample, = params
@@ -143,6 +172,17 @@ elif mode == "relabelall-merge":
 
     relabeled = noisy_df
 
+elif mode == "scoring":
+
+    topk, = params
+    topk = int(topk)
+
+    probs = noisy_predictions_df[class_cols].values
+    scores = score_samples(noisy_labels, probs)
+
+    selection = np.argsort(-scores)[:-topk]
+
+    relabeled = noisy_df.iloc[selection]
 
 print("Relabeled df shape:", relabeled.shape)
 
