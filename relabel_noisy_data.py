@@ -180,7 +180,7 @@ elif mode == "scoring":
     probs = noisy_predictions_df[class_cols].values
     scores = score_samples(noisy_labels, probs)
 
-    selection = np.argsort(-scores)[:-topk]
+    selection = np.argsort(-scores)[topk:]
 
     relabeled = noisy_df.iloc[selection]
 
