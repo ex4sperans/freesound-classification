@@ -154,7 +154,8 @@ elif mode == "relabelall-replacenan":
 
     new_labels = pd.Series(binary_to_labels(binary))
     where_non_empty = (new_labels != "")
-    noisy_df.labels[where_non_empty] = new_labels[where_non_empty]
+    noisy_df = noisy_df[where_non_empty]
+    noisy_df.labels = new_labels[where_non_empty]
 
     relabeled = noisy_df
 
