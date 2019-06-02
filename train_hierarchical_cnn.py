@@ -14,12 +14,12 @@ from sklearn.model_selection import train_test_split
 
 from datasets.sound_dataset import SoundDataset
 from networks.classifiers import HierarchicalCNNClassificationModel
-from ops.folds import train_validation_data
+from ops.folds import train_validation_data, train_validation_data_stratified
 from ops.transforms import (
     Compose, DropFields, LoadAudio,
     AudioFeatures, MapLabels, RenameFields,
     MixUp, SampleSegment, SampleLongAudio,
-    AudioAugmentation)
+    AudioAugmentation, ShuffleAudio, CutOut, Identity)
 from ops.utils import load_json, get_class_names_from_classmap, lwlrap
 from ops.padding import make_collate_fn
 
@@ -48,6 +48,14 @@ parser.add_argument(
 parser.add_argument(
     "--noisy_train_data_dir", type=str,
     help="path to noisy train data (optional)"
+)
+parser.add_argument(
+    "--share_noisy", action="store_true", default=False,
+    help="whether to share noisy files across folds"
+)
+parser.add_argument(
+    "--resume", action="store_true", default=False,
+    help="allow resuming even if experiment exists"
 )
 parser.add_argument(
     "--test_data_dir", required=True, type=str,
@@ -108,6 +116,11 @@ parser.add_argument(
     choices=("cuda", "cpu")
 )
 parser.add_argument(
+    "--aggregation_type", type=str, required=True,
+    help="how to aggregate outputs",
+    choices=("max", "rnn")
+)
+parser.add_argument(
     "--num_conv_blocks", type=int, default=5,
     help="number of conv blocks"
 )
@@ -126,10 +139,6 @@ parser.add_argument(
 parser.add_argument(
     "--weight_decay", type=float, default=1e-5,
     help="weight decay"
-)
-parser.add_argument(
-    "--dropout", type=float, default=0.0,
-    help="internal dropout"
 )
 parser.add_argument(
     "--output_dropout", type=float, default=0.0,
@@ -173,7 +182,7 @@ parser.add_argument(
     help="number of workers for data loader",
 )
 parser.add_argument(
-    "--label", type=str, default="hierarchical_cnn_classifier",
+    "--label", type=str, default="1d_cnn",
     help="optional label",
 )
 args = parser.parse_args()
@@ -188,8 +197,8 @@ with Experiment({
         "start_deep_supervision_on": args.start_deep_supervision_on,
         "conv_base_depth": args.conv_base_depth,
         "growth_rate": args.growth_rate,
-        "dropout": args.dropout,
         "output_dropout": args.output_dropout,
+        "aggregation_type": args.aggregation_type
     },
     "data": {
         "features": args.features,
@@ -200,7 +209,13 @@ with Experiment({
         "_holdout_size": args.holdout_size,
         "p_mixup": args.p_mixup,
         "p_aug": args.p_aug,
-        "max_audio_length": args.max_audio_length
+        "max_audio_length": args.max_audio_length,
+        "noisy": args.noisy_train_df is not None,
+        "_train_df": args.train_df,
+        "_train_data_dir": args.train_data_dir,
+        "_noisy_train_df": args.noisy_train_df,
+        "_noisy_train_data_dir": args.noisy_train_data_dir,
+        "_share_noisy": args.share_noisy
     },
     "train": {
         "accumulation_steps": args.accumulation_steps,
@@ -214,7 +229,7 @@ with Experiment({
         "switch_off_augmentations_on": args.switch_off_augmentations_on
     },
     "label": args.label
-}) as experiment:
+}, implicit_resuming=args.resume) as experiment:
 
     config = experiment.config
     print()
@@ -239,9 +254,14 @@ with Experiment({
         holdout_df = train_df.iloc[holdout].reset_index(drop=True)
         train_df = train_df.iloc[keep].reset_index(drop=True)
 
-    splits = list(train_validation_data(
-        train_df.fname, train_df.labels,
+    splits = list(train_validation_data_stratified(
+        train_df.fname, train_df.labels, class_map,
         config.data._n_folds, config.data._kfold_seed))
+
+    if args.noisy_train_df:
+        noisy_splits = list(train_validation_data(
+            noisy_train_df.fname, noisy_train_df.labels,
+            config.data._n_folds, config.data._kfold_seed))
 
     for fold in args.folds:
 
@@ -257,11 +277,23 @@ with Experiment({
         experiment.register_directory("predictions")
 
         if args.noisy_train_df:
-            noisy_audio_files = [
-                os.path.join(args.noisy_train_data_dir, fname)
-                for fname in noisy_train_df.fname.values]
-            noisy_labels = [
-                item.split(",") for item in noisy_train_df.labels.values]
+
+            noisy_train, noisy_valid = noisy_splits[fold]
+
+            if config.data._share_noisy:
+                noisy_audio_files = [
+                    os.path.join(args.noisy_train_data_dir, fname)
+                    for fname in noisy_train_df.fname.values]
+                noisy_labels = [
+                    item.split(",") for item in
+                    noisy_train_df.labels.values]
+            else:
+                noisy_audio_files = [
+                    os.path.join(args.noisy_train_data_dir, fname)
+                    for fname in noisy_train_df.fname.values[noisy_valid]]
+                noisy_labels = [
+                    item.split(",") for item in
+                    noisy_train_df.labels.values[noisy_valid]]
         else:
             noisy_audio_files = []
             noisy_labels = []
@@ -274,10 +306,15 @@ with Experiment({
                 labels=[
                     item.split(",") for item in
                     train_df.labels.values[train]] + noisy_labels,
+                is_noisy=[0] * len(train) + [1] * len(noisy_labels),
                 transform=Compose([
                     LoadAudio(),
                     SampleLongAudio(max_length=args.max_audio_length),
                     MapLabels(class_map=class_map),
+                    (
+                        ShuffleAudio(chunk_length=0.5, p=0.5)
+                        if config.network.aggregation_type != "rnn" else Identity()
+                    ),
                     MixUp(p=args.p_mixup),
                     AudioAugmentation(p=args.p_aug),
                     audio_transform,

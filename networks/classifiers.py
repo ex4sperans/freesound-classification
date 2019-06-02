@@ -114,9 +114,15 @@ class HierarchicalCNNClassificationModel(nn.Module):
         self.experiment = experiment
         self.config = experiment.config
 
+        if is_mel(self.config.data.features):
+            self.filterbanks = torch.from_numpy(
+                make_mel_filterbanks(self.config.data.features)).to(self.device)
+
         self.conv_modules = torch.nn.ModuleList()
+        self.rnns = torch.nn.ModuleList()
 
         total_depth = 0
+        rnn_size = 128
 
         for k in range(self.config.network.num_conv_blocks):
 
@@ -126,19 +132,29 @@ class HierarchicalCNNClassificationModel(nn.Module):
                 * self.config.network.conv_base_depth)
 
             if k >= self.config.network.start_deep_supervision_on:
-                total_depth += depth
+                if self.config.network.aggregation_type == "max":
+                    total_depth += depth
+                elif self.config.network.aggregation_type == "rnn":
+                    total_depth += rnn_size * 2
+                    self.rnns.append(
+                        nn.Sequential(
+                            nn.LayerNorm((depth,)),
+                            nn.GRU(
+                                depth, rnn_size, batch_first=True, bidirectional=True)
+                        )
+                    )
 
             modules = [nn.BatchNorm1d(input_size)]
             modules.extend([
                 nn.Conv1d(
                     input_size,
                     depth,
-                    kernel_size=3
+                    kernel_size=3,
+                    padding=1
                 ),
                 nn.MaxPool1d(kernel_size=2, stride=2),
                 nn.BatchNorm1d(depth),
                 nn.PReLU(depth),
-                ConvLockedDropout(self.config.network.dropout),
                 ResnetBlock(depth)
             ])
 
@@ -148,6 +164,9 @@ class HierarchicalCNNClassificationModel(nn.Module):
 
         self.output_transform = nn.Sequential(
             nn.BatchNorm1d(total_depth),
+            nn.Linear(total_depth, total_depth),
+            nn.BatchNorm1d(total_depth),
+            nn.PReLU(total_depth),
             nn.Dropout(p=self.config.network.output_dropout),
             nn.Linear(total_depth, self.config.data._n_classes)
         )
@@ -156,7 +175,21 @@ class HierarchicalCNNClassificationModel(nn.Module):
 
     def forward(self, signal):
 
-        signal = signal.permute(0, 2, 1)
+        if is_stft(self.config.data.features) or is_mel(self.config.data.features):
+            signal = compute_torch_stft(
+                signal.squeeze(-1),
+                self.config.data.features
+            )
+
+            if is_stft(self.config.data.features):
+                signal = torch.log(signal + 1e-4)
+
+        if is_mel(self.config.data.features):
+            signal = nn.functional.conv1d(
+                signal,
+                self.filterbanks.unsqueeze(-1)
+            )
+            signal = torch.log(signal + 1e-4)
 
         features = []
 
@@ -164,7 +197,14 @@ class HierarchicalCNNClassificationModel(nn.Module):
         for k, module in enumerate(self.conv_modules):
             h = module(h)
             if k >= self.config.network.start_deep_supervision_on:
-                features.append(self.global_maxpool(h).squeeze(-1))
+                if self.config.network.aggregation_type == "max":
+                    features.append(self.global_maxpool(h).squeeze(-1))
+                elif self.config.network.aggregation_type == "rnn":
+                    rnn_input = h.permute(0, 2, 1)
+                    outputs, state = self.rnns[
+                        k - self.config.network.start_deep_supervision_on](rnn_input)
+                    features.append(
+                        state.permute(1, 0, 2).contiguous().view(rnn_input.size(0), -1))
 
         features = torch.cat(features, -1)
 
