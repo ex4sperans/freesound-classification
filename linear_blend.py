@@ -5,6 +5,7 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 import scipy.optimize
+from scipy.stats import rankdata
 from mag.utils import blue, green, bold
 
 from ops.utils import lwlrap
@@ -21,6 +22,10 @@ parser.add_argument(
 parser.add_argument(
     "--train_df", type=str, required=True,
     help="path to train df"
+)
+parser.add_argument(
+    "--rankdata", action="store_true", default=False,
+    help="whether to use ranks instead of raw scores"
 )
 parser.add_argument(
     "--output_df", type=str, required=True,
@@ -44,9 +49,15 @@ def load_predictions(experiment):
     return df
 
 
+def to_ranks(values):
+    return np.array([rankdata(r) for r in values])
+
+
 predictions = [load_predictions(exp) for exp in args.experiments]
 class_cols = predictions[0].columns.drop("fname")
 prediction_values = [p[class_cols].values for p in predictions]
+if args.rankdata:
+    prediction_values = [to_ranks(p) for p in prediction_values]
 
 train_df = pd.read_csv(args.train_df)
 
@@ -110,7 +121,10 @@ test_preds = []
 for alpha, exp in zip(alphas, args.experiments):
     experiment_test_predictions = load_test_predictions(experiment)
     for p in experiment_test_predictions:
-        test_preds.append(p[class_cols].values * alpha)
+        if args.rankdata:
+            test_preds.append(to_ranks(p[class_cols].values) * alpha)
+        else:
+            test_preds.append(p[class_cols].values * alpha)
 
 test_preds = np.sum(test_preds, 0)
 
