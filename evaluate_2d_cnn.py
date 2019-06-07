@@ -71,10 +71,6 @@ parser.add_argument(
     choices=("cuda", "cpu")
 )
 parser.add_argument(
-    "--num_conv_blocks", type=int, default=5,
-    help="number of conv blocks"
-)
-parser.add_argument(
     "--num_workers", type=int, default=4,
     help="number of workers for data loader",
 )
