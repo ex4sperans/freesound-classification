@@ -1,6 +1,6 @@
 # 3rd place solution to Freesound Audio Tagging 2019 Challenge
 
-My approach is outlined belo
+My approach is outlined below.
 
 **Models**
 
