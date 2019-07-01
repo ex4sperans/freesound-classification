@@ -39,5 +39,3 @@ I got a great speed-up by computing both STFT spectrograms and mel spectrograms 
 **Final ensemble**
 
 For the final solution, I used a simple average of 11 models trained with slightly different architectures (1d/2d cnn, rnn/no-rnn), slightly different subsets of the noisy set (see "noisy data" section) and slightly different hyperparameters. 
-
-So
