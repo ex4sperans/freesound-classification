@@ -38,4 +38,91 @@ I got a great speed-up by computing both STFT spectrograms and mel spectrograms 
 
 **Final ensemble**
 
-For the final solution, I used a simple average of 11 models trained with slightly different architectures (1d/2d cnn, rnn/no-rnn), slightly different subsets of the noisy set (see "noisy data" section) and slightly different hyperparameters. 
+For the final solution, I used a simple average of 11 models trained with slightly different architectures (1d/2d cnn, rnn/no-rnn), slightly different subsets of the noisy set (see "noisy data" section) and slightly different hyperparameters.
+
+### Project structure
+
+Main training scripts are `train_2d_cnn.py` and `train_hierarcical_cnn.py`. All classification models are defined in `networks/classifiers`. All data augmentations are defined in `ops/transforms`.
+
+### Setting up the environment
+
+I recommend using some environment manager such as conda or virtualenv in order to avoid potential conflicts between different versions of packages. To install all required packages, simply run `pip install -r requirements.txt`. This might take up to 15 minutes depending on your internet connection speed.
+
+### Preparing data
+
+I place all the data into `data/` directory, please adjust the following code to match yours data location. Run
+
+```bash
+python create_class_map.py --train_df data/train_curated.csv --output_file data/classmap.json
+```
+
+### Running a basic 2d model
+
+```bash
+python train_2d_cnn.py \
+  --train_df data/train_curated.csv \
+  --train_data_dir data/train_curated/ \
+  --classmap data/classmap.json \
+  --device=cuda \
+  --optimizer=adam \
+  --folds 0 1 2 3 4 \
+  --n_folds=5 \
+  --log_interval=10 \
+  --batch_size=20 \
+  --epochs=20 \
+  --accumulation_steps=1 \
+  --save_every=20 \
+  --num_conv_blocks=5 \
+  --conv_base_depth=50 \
+  --growth_rate=1.5 \
+  --weight_decay=0.0 \
+  --start_deep_supervision_on=1 \
+  --lr=0.003 \
+  --scheduler=1cycle_0.0001_0.005 \
+  --test_data_dir data/test \
+  --sample_submission data/sample_submission.csv \
+  --num_workers=6 \
+  --output_dropout=0.0 \
+  --p_mixup=0.0 \
+  --switch_off_augmentations_on=15 \
+  --features=mel_2048_1024_128 \
+  --max_audio_length=15 \
+  --p_aug=0.0 \
+  --label=basic_2d_cnn
+```
+
+### Running a 2d model with augmentations
+
+
+```bash
+python train_2d_cnn.py \
+  --train_df data/train_curated.csv \
+  --train_data_dir data/train_curated/ \
+  --classmap data/classmap.json \
+  --device=cuda \
+  --optimizer=adam \
+  --folds 0 1 2 3 4 \
+  --n_folds=5 \
+  --log_interval=10 \
+  --batch_size=20 \
+  --epochs=100 \
+  --accumulation_steps=1 \
+  --save_every=20 \
+  --num_conv_blocks=5 \
+  --conv_base_depth=100 \
+  --growth_rate=1.5 \
+  --weight_decay=0.0 \
+  --start_deep_supervision_on=1 \
+  --lr=0.003 \
+  --scheduler=1cycle_0.0001_0.005 \
+  --test_data_dir data/test \
+  --sample_submission data/sample_submission.csv \
+  --num_workers=16 \
+  --output_dropout=0.5 \
+  --p_mixup=0.5 \
+  --switch_off_augmentations_on=90 \
+  --features=mel_2048_1024_128 \
+  --max_audio_length=15 \
+  --p_aug=0.75 \
+  --label=2d_cnn
+```
