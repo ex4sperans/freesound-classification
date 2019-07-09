@@ -56,6 +56,8 @@ I place all the data into `data/` directory, please adjust the following code to
 python create_class_map.py --train_df data/train_curated.csv --output_file data/classmap.json
 ```
 
+This simply creates a JSON file with deterministic classname->label mapping used in all future experiments.
+
 ### Running a basic 2d model
 
 ```bash
@@ -77,6 +79,7 @@ python train_2d_cnn.py \
   --growth_rate=1.5 \
   --weight_decay=0.0 \
   --start_deep_supervision_on=1 \
+  --aggregation_type=max \
   --lr=0.003 \
   --scheduler=1cycle_0.0001_0.005 \
   --test_data_dir data/test \
@@ -113,6 +116,7 @@ python train_2d_cnn.py \
   --growth_rate=1.5 \
   --weight_decay=0.0 \
   --start_deep_supervision_on=1 \
+  --aggregation_type=max \
   --lr=0.003 \
   --scheduler=1cycle_0.0001_0.005 \
   --test_data_dir data/test \
@@ -125,4 +129,90 @@ python train_2d_cnn.py \
   --max_audio_length=15 \
   --p_aug=0.75 \
   --label=2d_cnn
+```
+
+Note that each such run is followed a creation of a new experiment subdirectory in the `experiments` folder. Each experiment has the following structure:
+
+```bash
+experiments/some_experiment/
+├── checkpoints
+├── command
+├── commit_hash
+├── config.json
+├── log
+├── predictions
+├── results.json
+└── summaries
+```
+
+### Using a clean model to select noisy samples
+
+Create a new predictions directory:
+
+```mkdir predictions/```
+
+Then, running 
+
+```bash
+python predict_2d_cnn.py \
+  --experiment=path_to_an_experiment (see above) \
+  --test_df=data/train_noisy.csv \
+  --test_data_dir=data/train_noisy/ \
+  --output_df=predictions/noisy_probabilities.csv \
+  --classmap=data/classmap.json \
+  --device=cuda
+```
+
+creates a new csv file in the predictions folder with the class probabilties for the noisy dataset.
+
+Running 
+
+```bash
+python relabel_noisy_data.py \
+  --noisy_df=data/train_noisy.csv \
+  --noisy_predictions_df=predictions/noisy_probabilities.csv \
+  --output_df=predictions/train_noisy_relabeled_1k.csv \
+  --mode=scoring_1000
+```
+
+creates a new noisy dataframe where only top 1k labels in terms of agreement between the model and the actual labels are kept.
+
+
+### Running a 2d model with noisy data
+
+
+```bash
+python train_2d_cnn.py \
+  --train_df data/train_curated.csv \
+  --train_data_dir data/train_curated/ \
+  --noisy_train_df predictions/ train_noisy_relabeled_1k.csv \
+  --noisy_train_data_dir data/train_noisy/ \
+  --classmap data/classmap.json \
+  --device=cuda \
+  --optimizer=adam \
+  --folds 0 1 2 3 4 \
+  --n_folds=5 \
+  --log_interval=10 \
+  --batch_size=20 \
+  --epochs=150 \
+  --accumulation_steps=1 \
+  --save_every=20 \
+  --num_conv_blocks=6 \
+  --conv_base_depth=100 \
+  --growth_rate=1.5 \
+  --weight_decay=0.0 \
+  --start_deep_supervision_on=1 \
+  --aggregation_type=max \
+  --lr=0.003 \
+  --scheduler=1cycle_0.0001_0.005 \
+  --test_data_dir data/test \
+  --sample_submission data/sample_submission.csv \
+  --num_workers=16 \
+  --output_dropout=0.7 \
+  --p_mixup=0.5 \
+  --switch_off_augmentations_on=140 \
+  --features=mel_2048_1024_128 \
+  --max_audio_length=15 \
+  --p_aug=0.75 \
+  --label=2d_cnn_noisy
 ```
