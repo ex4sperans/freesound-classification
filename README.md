@@ -216,3 +216,5 @@ python train_2d_cnn.py \
   --p_aug=0.75 \
   --label=2d_cnn_noisy
 ```
+
+Note that `relabel_noisy_data.py` script supports multiple relabeling straregies. I mostly followed "scoring" strategy (selecting top-k noisy samples based on the agreement between the model and the actual labels), but after 5k noisy samples I switched to "relabelall-replacenan" strategy which is just a pseudolabeling (usage of old model outputs) where the samples without any predictions are discarded.
