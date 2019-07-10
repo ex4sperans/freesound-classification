@@ -4,7 +4,7 @@ My approach is outlined below.
 
 **Models**
 
-I used two types of models, both are based on convolutions. The first type uses 2d convolutions and works on top of mel-scale spectrograms, while the second uses 1d-convolutions on top of raw STFT representations with relatively small window size like 256, so it's only 5 ms per frame or so. Both types of models are relatively shallow and consist of 10-12 convolutional layers (or 5-6 resnet blocks) with a small number of filters. I use a form of deep supervision by applying global max pooling after each block (typically starting from the first or second block) and then concatenating maxpool outputs from each layer to form the final feature vector which then goes to a 2-layer fully-connected classifier. I also tried using RNN's instead of a max pooling for some models. It made results a bit worse, but RNN seemed to make different mistakes, so it turned out to be a good member of the final ensemble.
+I used two types of models, both are based on convolutions. The first type uses 2d convolutions and works on top of mel-scale spectrograms, while the second uses 1d-convolutions on top of raw STFT representations with relatively small window size like 256, so it's only 5 ms per frame or so. Both types of models are relatively shallow and consist of 10-12 convolutional layers (or 5-6 resnet blocks) with a small number of filters. I use a form of deep supervision by applying global max pooling after each block (typically starting from the first or second block) and then concatenating maxpool outputs from each layer to form the final feature vector which then goes to a 2-layer fully-connected classifier. I also tried using RNNs instead of a max pooling for some models. It made results a bit worse, but RNN seemed to make different mistakes, so it turned out to be a good member of the final ensemble.
 
 **Frequency encoding**
 
@@ -131,7 +131,7 @@ python train_2d_cnn.py \
   --label=2d_cnn
 ```
 
-Note that each such run is followed a creation of a new experiment subdirectory in the `experiments` folder. Each experiment has the following structure:
+Note that each such run is followed by a creation of a new experiment subdirectory in the `experiments` folder. Each experiment has the following structure:
 
 ```bash
 experiments/some_experiment/
@@ -217,4 +217,4 @@ python train_2d_cnn.py \
   --label=2d_cnn_noisy
 ```
 
-Note that `relabel_noisy_data.py` script supports multiple relabeling straregies. I mostly followed "scoring" strategy (selecting top-k noisy samples based on the agreement between the model and the actual labels), but after 5k noisy samples I switched to "relabelall-replacenan" strategy which is just a pseudolabeling (usage of old model outputs) where the samples without any predictions are discarded.
+Note that `relabel_noisy_data.py` script supports multiple relabeling straregies. I mostly followed "scoring" strategy (selecting top-k noisy samples based on the agreement between the model and the actual labels), but after 5k noisy samples I switched to "relabelall-replacenan" strategy which is just a pseudolabeling (usage of the old model outputs) where the samples without any predictions are discarded.
